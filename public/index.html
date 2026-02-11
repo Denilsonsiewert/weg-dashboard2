@@ -41,6 +41,16 @@
             z-index: 100;
         }
 
+        .logo-weg { height: 50px; }
+        .header-title {
+            font-size: 1.8em;
+            font-weight: 700;
+            color: var(--weg-blue);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-align: center;
+        }
+
         .header-right { text-align: right; }
         #clock { font-size: 1.4em; font-weight: 600; color: var(--weg-blue); }
         #date { font-size: 0.9em; color: var(--weg-gray); }
@@ -91,7 +101,6 @@
 
         .chart-wrapper { flex: 1; min-height: 0; margin-bottom: 20px; }
 
-        /* ====== TABELAS ====== */
         table {
             width: 100%;
             border-collapse: separate;
@@ -103,6 +112,7 @@
             background-color: var(--weg-light-blue);
             color: var(--weg-blue);
             padding: 15px;
+            text-align: left;
             font-weight: 600;
             border-bottom: 2px solid var(--weg-blue);
         }
@@ -111,19 +121,6 @@
             padding: 15px;
             border-bottom: 1px solid #eee;
             color: #333;
-        }
-
-        /* Padrão: centralizado para todos */
-        th, td { text-align: center; }
-
-        /* Capa: 1ª coluna à esquerda (tanque/equipamento) */
-        table.tbl-capa th:first-child,
-        table.tbl-capa td:first-child {
-            text-align: left;
-        }
-
-        /* Análises (gráficos): manter todas as colunas centralizadas, inclusive DATA */
-        table.tbl-analises th, table.tbl-analises td {
             text-align: center;
         }
 
@@ -163,23 +160,15 @@
 </head>
 <body>
     <header class="header">
-    <div></div> <!-- espaço vazio da esquerda -->
-    
-    <div class="header-title">Controle Analítico Estanhagem</div>
-    
-    <div class="header-right">
-        <div id="clock">00:00:00</div>
-        <div id="date">--/--/----</div>
-    </div>
-</header>
-.header-title {
-    font-size: 3.2em;          /* AUMENTA bastante o tamanho do título */
-    font-weight: 900;          /* Bem forte */
-    text-align: center;        /* Centraliza horizontalmente */
-    color: var(--weg-blue);    /* Cor azul WEG */
-    width: 100%;               /* Ocupa toda a largura da header */
-    grid-column: 1 / 4;        /* Faz o título ficar exatamente no CENTRO */
-}
+        <img src="" alt="" class=""
+             onerror="'">
+        <div class="header-title">Controle Analítico Estanhagem</div>
+        <div class="header-right">
+            <div id="clock">00:00:00</div>
+            <div id="date">--/--/----</div>
+        </div>
+    </header>
+
     <main class="slide-container" id="slides"></main>
 
     <footer class="footer">
@@ -204,10 +193,6 @@
         let dataCache = null;
         const wegColors = ['#00579d', '#00a1e4', '#58595b', '#808285'];
         const chartsRegistry = new Map(); // id -> Chart instance
-
-        // Slideshow com tempo fixo por slide
-        const SLIDE_DURATION = 20000; // ms
-        let slideshowTimer = null;
 
         // Limites de controle (mantidos)
         const controlLimits = {
@@ -330,7 +315,6 @@
                     </div>`;
                 container.appendChild(noSlide);
                 currentSlideIndex = 0;
-                restartSlideshow();
                 return;
             }
 
@@ -343,9 +327,9 @@
                     const statusData = Array.isArray(slideObj.dados?.status_data) ? slideObj.dados.status_data : [];
                     const rows = statusData.map(s => `
                         <tr>
-                            <td style="font-weight:700;color:var(--weg-blue);">${s?.tanque ?? '-'}</td>
-                            <td style="font-weight:600;">${s?.proxima ?? '-'}</td>
-                            <td>
+                            <td style="font-weight:700;color:var(--weg-blue);text-align:left;">${s?.tanque ?? '-'}</td>
+                            <td style="text-align:center;font-weight:600;">${s?.proxima ?? '-'}</td>
+                            <td style="text-align:center;">
                                 <span class="status-badge ${(s?.status || '').includes('ATRASADO') ? 'status-atrasado' : 'status-ok'}">
                                     ${s?.status ?? '—'}
                                 </span>
@@ -356,12 +340,12 @@
                         <div class="card">
                             <div class="card-title">Resumo de Status das Análises</div>
                             <div style="flex:1;display:flex;align-items:center;">
-                                <table class="tbl-capa">
+                                <table>
                                     <thead>
                                         <tr>
-                                            <th>EQUIPAMENTO / TANQUE</th>
-                                            <th>PRÓXIMA ANÁLISE</th>
-                                            <th>STATUS ATUAL</th>
+                                            <th style="text-align:left;">EQUIPAMENTO / TANQUE</th>
+                                            <th style="text-align:center;">PRÓXIMA ANÁLISE</th>
+                                            <th style="text-align:center;">STATUS ATUAL</th>
                                         </tr>
                                     </thead>
                                     <tbody>${rows}</tbody>
@@ -379,7 +363,7 @@
                         const headers = dsArr.map(ds => {
                             const label = (ds?.label ?? '').toString();
                             const short = label.split(' ')[0] || label;
-                            return `<th>${short}</th>`;
+                            return `<th style="text-align:center;">${short}</th>`;
                         }).join('');
 
                         const ult = Array.isArray(ana?.ultimas_analises) ? ana.ultimas_analises : [];
@@ -387,16 +371,15 @@
                             let vals = '';
                             for (let k = 1; k <= dsArr.length; k++) {
                                 const val = r?.[`Val${k}`];
-                                vals += `<td style="font-weight:600;">${val ?? '—'}</td>`;
+                                vals += `<td style="text-align:center;font-weight:600;">${val ?? '—'}</td>`;
                             }
-                            // DATA centralizada (sem força de alinhamento à esquerda)
                             return `<tr><td style="font-weight:600;">${r?.Data ?? '-'}</td>${vals}</tr>`;
                         }).join('');
 
                         card.innerHTML = `
                             <div class="card-title">${ana?.nome ?? '—'}</div>
                             <div class="chart-wrapper"><canvas id="${canvasId}"></canvas></div>
-                            <table class="tbl-analises">
+                            <table>
                                 <thead><tr><th>DATA</th>${headers}</tr></thead>
                                 <tbody>${rows}</tbody>
                             </table>`;
@@ -412,7 +395,6 @@
             });
 
             currentSlideIndex = 0;
-            restartSlideshow();
         }
 
         function renderChart(id, chartData, tankName) {
@@ -427,6 +409,8 @@
             }
 
             // Prepara anotações (faixa ideal)
+            // - Para tanques simples: usa min/max direto
+            // - Para multi-parâmetro: tenta casar com o label do 1º dataset; se não achar, usa o 1º disponível
             let ann = {};
             const firstLabel = dsArr[0]?.label ?? '';
             const limits = getLimitsFor(tankName, firstLabel);
@@ -493,44 +477,13 @@
             }
         }
 
-        // --- Slideshow com tempo fixo e consistente ---
-        function clearSlideshowTimer() {
-            if (slideshowTimer) {
-                clearTimeout(slideshowTimer);
-                slideshowTimer = null;
-            }
-        }
-
-        function scheduleNextSlide() {
-            clearSlideshowTimer();
-            slideshowTimer = setTimeout(() => {
-                nextSlide();
-                scheduleNextSlide();
-            }, SLIDE_DURATION);
-        }
-
-        function restartSlideshow() {
-            // Garante que o slide ativo atual fique o tempo completo
-            scheduleNextSlide();
-        }
-
         function nextSlide() {
             const slides = document.querySelectorAll('.slide');
             if (slides.length <= 1) return;
-
             slides[currentSlideIndex].classList.remove('active');
             currentSlideIndex = (currentSlideIndex + 1) % slides.length;
             slides[currentSlideIndex].classList.add('active');
         }
-
-        // Reinicia temporizador ao voltar a aba/janela
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) {
-                restartSlideshow();
-            } else {
-                clearSlideshowTimer();
-            }
-        });
 
         function updateClock() {
             const now = new Date();
@@ -542,7 +495,7 @@
 
         // Timers
         setInterval(updateClock, 1000);
-        // Removido o setInterval de nextSlide; usamos o scheduleNextSlide
+        setInterval(nextSlide, 20000);
         setInterval(fetchData, 60000);
 
         // Boot
