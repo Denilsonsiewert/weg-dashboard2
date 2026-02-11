@@ -224,10 +224,16 @@
             console.warn('Falha ao registrar plugin de anotação:', e);
         }
 
+        // Estado e constantes
         let currentSlideIndex = 0;
         let dataCache = null;
         const wegColors = ['#00579d', '#00a1e4', '#58595b', '#808285'];
         const chartsRegistry = new Map(); // id -> Chart instance
+
+        // NOVAS VARIÁVEIS PARA O AGENDADOR
+        const DISPLAY_MS = 20000;       // 20s por slide
+        let slideTimer = null;          // id do setTimeout atual
+        let lastSwitchTs = performance.now();
 
         // Limites de controle (mantidos)
         const controlLimits = {
@@ -308,6 +314,12 @@
                     `Última Atualização: ${ts.toLocaleString('pt-BR')}`;
 
                 setupSlides();
+
+                // Reagendar a próxima troca com o tempo restante do ciclo atual
+                const now = performance.now();
+                const elapsed = now - lastSwitchTs;
+                const remaining = DISPLAY_MS - (elapsed % DISPLAY_MS);
+                scheduleNextSlide(remaining);
             } catch (e) {
                 console.error("Erro ao buscar dados", e);
                 document.getElementById('lastUpdate').textContent = 'Erro ao carregar dados. Aguardando Excel...';
@@ -355,7 +367,8 @@
 
             slidesData.forEach((slideObj, sIndex) => {
                 const slide = document.createElement('div');
-                slide.className = `slide ${sIndex === 0 ? 'active' : ''}`;
+                // Não marcamos mais "active" aqui; reativaremos ao final conforme currentSlideIndex
+                slide.className = 'slide';
 
                 if (slideObj.tipo === 'capa') {
                     slide.classList.add('full-slide');
@@ -408,7 +421,7 @@
                                 const val = r?.[`Val${k}`];
                                 vals += `<td style="text-align:center;font-weight:600;">${val ?? '—'}</td>`;
                             }
-                            // --- Correção: DATA centralizada (combina com os valores) ---
+                            // DATA centralizada
                             return `<tr><td style="text-align:center;font-weight:600;">${r?.Data ?? '-'}</td>${vals}</tr>`;
                         }).join('');
 
@@ -430,7 +443,12 @@
                 container.appendChild(slide);
             });
 
-            currentSlideIndex = 0;
+            // --- Reaplicar a visibilidade do slide corrente sem resetar índice ---
+            const slides = container.querySelectorAll('.slide');
+            // Clampar o índice ao total atual de slides
+            currentSlideIndex = Math.max(0, Math.min(currentSlideIndex, slides.length - 1));
+            slides.forEach(s => s.classList.remove('active'));
+            if (slides[currentSlideIndex]) slides[currentSlideIndex].classList.add('active');
         }
 
         function renderChart(id, chartData, tankName) {
@@ -511,12 +529,31 @@
             }
         }
 
-        function nextSlide() {
+        // --- NOVO: controle do ciclo de slides com tempo exato por slide ---
+        function showSlideAt(index) {
             const slides = document.querySelectorAll('.slide');
-            if (slides.length <= 1) return;
-            slides[currentSlideIndex].classList.remove('active');
-            currentSlideIndex = (currentSlideIndex + 1) % slides.length;
-            slides[currentSlideIndex].classList.add('active');
+            if (slides.length === 0) return;
+
+            const curr = slides[currentSlideIndex];
+            if (curr) curr.classList.remove('active');
+
+            currentSlideIndex = Math.max(0, Math.min(index, slides.length - 1));
+
+            const next = slides[currentSlideIndex];
+            if (next) next.classList.add('active');
+        }
+
+        function scheduleNextSlide(delayMs) {
+            if (slideTimer) clearTimeout(slideTimer);
+            slideTimer = setTimeout(() => {
+                const slides = document.querySelectorAll('.slide');
+                if (slides.length > 1) {
+                    showSlideAt((currentSlideIndex + 1) % slides.length);
+                }
+                lastSwitchTs = performance.now();
+                // Agenda novamente o ciclo completo
+                scheduleNextSlide(DISPLAY_MS);
+            }, Math.max(0, delayMs));
         }
 
         function updateClock() {
@@ -528,14 +565,17 @@
             });
         }
 
-        // Timers
+        // Agendadores
         setInterval(updateClock, 1000);
-        setInterval(nextSlide, 20000);
         setInterval(fetchData, 60000);
 
         // Boot
         updateClock();
         fetchData();
+
+        // Inicia o agendador de slides (garante 20s por slide; fetchData re-sincroniza após cada atualização)
+        lastSwitchTs = performance.now();
+        scheduleNextSlide(DISPLAY_MS);
     </script>
 </body>
 </html>
