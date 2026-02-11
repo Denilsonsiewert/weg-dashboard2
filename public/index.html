@@ -5,8 +5,8 @@
     <title>WEG - Controle Analítico Estanhagem</title>
 
     <!-- Chart.js + Plugin de Anotação -->
-    https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js</script>
-    https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js</script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
 
     <style>
         :root {
@@ -156,14 +156,12 @@
             70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
             100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
         }
-
-        /* Desativa a animação de entrada apenas durante refresh de dados */
-        .no-anim .slide { animation: none !important; }
     </style>
 </head>
 <body>
     <header class="header">
-        weg_logo.png
+        <img src="weg_logo.png" alt="WEG Logo" class="logo-weg"
+             onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Weg_logo.svg/1200px-Weg_logo.svg.png'">
         <div class="header-title">Controle Analítico Estanhagem</div>
         <div class="header-right">
             <div id="clock">00:00:00</div>
@@ -193,83 +191,11 @@
 
         let currentSlideIndex = 0;
         let dataCache = null;
+        const wegColors = ['#00579d', '#00a1e4', '#58595b', '#808285'];
         const chartsRegistry = new Map(); // id -> Chart instance
 
-        // Paleta fallback (se não houver mapeamento da série)
-        const wegColors = ['#00579d', '#00a1e4', '#58595b', '#808285'];
-
-        // Mapa de cores por Tanque -> Série
-        const colorMap = {
-            "Estanhagem A": {
-                "Sn (g/L)":   "#00579D",
-                "H2SO4 (mL/L)": "#FF7F0E"
-            },
-            "Estanhagem B": {
-                "Sn (g/L)":   "#00579D",
-                "H2SO4 (mL/L)": "#FF7F0E"
-            },
-            "Níquel WATT": {
-                "Niº (g/L)":   "#00579D",
-                "NiCl2 (mL/L)": "#00A1E4",
-                "H3BO3 (g/L)": "#9467BD"
-            },
-            "Desengraxante": {
-                "Concentração": "#00579D",
-                "Concentração do banho (mL/L)": "#00579D"
-            },
-            "Ativação - Tanque 5": {
-                "pH": "#00A1E4",
-                "pH do banho": "#00A1E4"
-            },
-            "Ativação - Tanque 6": {
-                "Concentração (mL/L)": "#00579D",
-                "Concentração do banho (mL/L)": "#00579D"
-            },
-            "Selante": {
-                "Concentração (%)": "#00A1E4",
-                "Concentração": "#00A1E4"
-            }
-        };
-
-        // ---- Normalização para casamentos tolerantes de rótulos ----
-        const normalize = (s) => (s ?? '')
-            .toString()
-            .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
-            .replace(/[º°]/g, '') // remove símbolos grau/ordinal
-            .replace(/\s+/g, ' ') // espaços múltiplos -> 1
-            .trim()
-            .toLowerCase();
-
-        function hexToRgba(hex, alpha = 0.1) {
-            const h = hex.replace('#', '');
-            const bigint = parseInt(h, 16);
-            if (h.length !== 6 || Number.isNaN(bigint)) return `rgba(0,0,0,${alpha})`;
-            const r = (bigint >> 16) & 255;
-            const g = (bigint >> 8) & 255;
-            const b = bigint & 255;
-            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-        }
-
-        function getSeriesColor(tankName, seriesLabel, fallbackIndex) {
-            const t = colorMap[tankName] || null;
-            if (!t) return wegColors[fallbackIndex % wegColors.length];
-
-            // 1) tentativa exata
-            if (t[seriesLabel]) return t[seriesLabel];
-
-            // 2) normalização e match flexível
-            const nLabel = normalize(seriesLabel);
-            const entries = Object.entries(t);
-            for (const [key, val] of entries) {
-                const nk = normalize(key);
-                if (nk === nLabel || nk.includes(nLabel) || nLabel.includes(nk)) return val;
-            }
-
-            // 3) fallback paleta
-            return wegColors[fallbackIndex % wegColors.length];
-        }
-
-        const chartsControlLimits = {
+        // Limites de controle (mantidos)
+        const controlLimits = {
             "Desengraxante": { min: 30, max: 40 },
             "Ativação - Tanque 5": { min: 0.5, max: 1.5 },
             "Ativação - Tanque 6": { min: 30, max: 40 },
@@ -288,9 +214,39 @@
             }
         };
 
-        // Mantém chave estável do slide ativo e último timestamp
-        let currentSlideKey = null;
-        let lastTimestamp = null;
+        // --- Helpers robustos ---
+        const normalize = (s) => (s ?? '')
+            .toString()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
+            .replace(/[º°]/g, '') // remove símbolos grau/ordinal
+            .replace(/\s+/g, ' ') // espaços múltiplos -> 1
+            .trim()
+            .toLowerCase();
+
+        function getLimitsFor(tankName, datasetLabel) {
+            const lim = controlLimits?.[tankName];
+            if (!lim) return null;
+
+            // Caso simples (um único range min/max)
+            if (typeof lim.min === 'number' || typeof lim.max === 'number') {
+                return lim;
+            }
+
+            // Caso multi-parâmetro: busca flexível por chave
+            const nLabel = normalize(datasetLabel);
+            let found = null;
+
+            for (const key of Object.keys(lim)) {
+                const nKey = normalize(key);
+                if (nKey === nLabel || nKey.includes(nLabel) || nLabel.includes(nKey)) {
+                    found = lim[key];
+                    break;
+                }
+            }
+
+            // Fallback: primeiro parâmetro se não achou correspondência
+            return found ?? lim[Object.keys(lim)[0]];
+        }
 
         function toNumber(v) {
             if (typeof v === 'number') return v;
@@ -298,39 +254,6 @@
             const s = String(v).replace(',', '.').trim();
             const n = Number(s);
             return Number.isFinite(n) ? n : null;
-        }
-
-        // Helpers para IDs estáveis e chaves de slide
-        const slug = (s) => (s ?? '')
-          .toString()
-          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-          .replace(/[^\w\s-]/g, '')
-          .trim()
-          .replace(/\s+/g, '-')
-          .toLowerCase();
-
-        function slideKey(slideObj) {
-            if (slideObj.tipo === 'capa') return 'capa';
-            const nomes = (slideObj.dados || []).map(d => d?.nome || '').map(slug);
-            return `analise:${nomes.join('|')}`;
-        }
-
-        function slideTanks(slideObj) {
-            if (slideObj.tipo === 'capa') return ['capa'];
-            return (slideObj.dados || []).map(d => slug(d?.nome || ''));
-        }
-
-        function buildSlidesData(cache) {
-            const analisesAll = Array.isArray(cache?.analises) ? cache.analises : [];
-            const capa = analisesAll.find(a => a?.tipo === 'capa');
-            const analises = analisesAll.filter(a => a?.tipo === 'analise');
-
-            const slidesData = [];
-            if (capa) slidesData.push({ tipo: 'capa', dados: capa });
-            for (let i = 0; i < analises.length; i += 2) {
-                slidesData.push({ tipo: 'analise', dados: analises.slice(i, i + 2) });
-            }
-            return slidesData;
         }
 
         async function fetchData() {
@@ -343,24 +266,13 @@
                 const res = await fetch(API_URL, { cache: 'no-store' });
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-                const json = await res.json();
-                const ts = json?.timestamp ? new Date(json.timestamp) : new Date();
+                dataCache = await res.json();
 
-                // Evita rebuild se nada mudou
-                if (lastTimestamp && new Date(lastTimestamp).getTime() === ts.getTime()) {
-                    document.getElementById('lastUpdate').textContent =
-                        `Última Atualização: ${ts.toLocaleString('pt-BR')} (sem alterações)`;
-                    return;
-                }
-
-                dataCache = json;
-                lastTimestamp = ts.toISOString();
-
+                const ts = dataCache?.timestamp ? new Date(dataCache.timestamp) : new Date();
                 document.getElementById('lastUpdate').textContent =
                     `Última Atualização: ${ts.toLocaleString('pt-BR')}`;
 
-                setupSlides({ preserveActive: true });
-
+                setupSlides();
             } catch (e) {
                 console.error("Erro ao buscar dados", e);
                 document.getElementById('lastUpdate').textContent = 'Erro ao carregar dados. Aguardando Excel...';
@@ -374,36 +286,26 @@
             chartsRegistry.clear();
         }
 
-        function setupSlides({ preserveActive = true } = {}) {
+        function setupSlides() {
             const container = document.getElementById('slides');
-
-            // Capturar contexto do slide ativo
-            let prevKey = null;
-            let prevTanks = [];
-            if (preserveActive) {
-                const slides = document.querySelectorAll('.slide');
-                if (slides.length) {
-                    const active = slides[currentSlideIndex] || slides[0];
-                    prevKey = active?.dataset?.key || currentSlideKey;
-
-                    const titles = Array.from(active?.querySelectorAll('.card .card-title') || [])
-                        .map(el => slug(el.textContent || ''))
-                        .filter(s => s && s !== 'resumo-de-status-das-analises');
-                    prevTanks = titles.length ? titles : (prevKey ? [prevKey] : []);
-                }
-            }
-
-            const slidesData = buildSlidesData(dataCache);
-
-            destroyAllCharts();
-            container.classList.add('no-anim');
             container.innerHTML = '';
+
+            // Destroi charts prévios para evitar vazamento
+            destroyAllCharts();
+
+            const analisesAll = Array.isArray(dataCache?.analises) ? dataCache.analises : [];
+            const capa = analisesAll.find(a => a?.tipo === 'capa');
+            const analises = analisesAll.filter(a => a?.tipo === 'analise');
+
+            const slidesData = [];
+            if (capa) slidesData.push({ tipo: 'capa', dados: capa });
+            for (let i = 0; i < analises.length; i += 2) {
+                slidesData.push({ tipo: 'analise', dados: analises.slice(i, i + 2) });
+            }
 
             if (slidesData.length === 0) {
                 const noSlide = document.createElement('div');
                 noSlide.className = 'slide active full-slide';
-                noSlide.dataset.key = 'sem-dados';
-                noSlide.dataset.tanks = 'sem-dados';
                 noSlide.innerHTML = `
                     <div class="card">
                         <div class="card-title">Sem dados disponíveis</div>
@@ -413,22 +315,12 @@
                     </div>`;
                 container.appendChild(noSlide);
                 currentSlideIndex = 0;
-                currentSlideKey = 'sem-dados';
-                container.offsetHeight;
-                container.classList.remove('no-anim');
                 return;
             }
 
-            const newSlides = [];
-            slidesData.forEach((slideObj) => {
+            slidesData.forEach((slideObj, sIndex) => {
                 const slide = document.createElement('div');
-                slide.className = 'slide';
-
-                const key = slideKey(slideObj);
-                const tanks = slideTanks(slideObj);
-
-                slide.dataset.key = key;
-                slide.dataset.tanks = tanks.join(',');
+                slide.className = `slide ${sIndex === 0 ? 'active' : ''}`;
 
                 if (slideObj.tipo === 'capa') {
                     slide.classList.add('full-slide');
@@ -462,11 +354,10 @@
                         </div>`;
                 } else {
                     const cards = Array.isArray(slideObj.dados) ? slideObj.dados : [];
-                    cards.forEach((ana) => {
+                    cards.forEach((ana, aIndex) => {
                         const card = document.createElement('div');
                         card.className = 'card';
-
-                        const canvasId = `chart-${slug(ana?.nome)}`;
+                        const canvasId = `chart-${sIndex}-${aIndex}`;
 
                         const dsArr = Array.isArray(ana?.chart_data?.datasets) ? ana.chart_data.datasets : [];
                         const headers = dsArr.map(ds => {
@@ -493,58 +384,17 @@
                                 <tbody>${rows}</tbody>
                             </table>`;
 
+                        // Garante que o canvas exista antes de renderizar
                         requestAnimationFrame(() => renderChart(canvasId, ana?.chart_data, ana?.nome));
+
                         slide.appendChild(card);
                     });
                 }
 
                 container.appendChild(slide);
-                newSlides.push(slide);
             });
 
-            // Reativar o mesmo slide de antes (key; senão melhor match pelos tanques)
-            let newIndex = 0;
-            if (preserveActive) {
-                if (prevKey) {
-                    const idxByKey = newSlides.findIndex(s => s.dataset.key === prevKey);
-                    if (idxByKey >= 0) newIndex = idxByKey;
-                    else {
-                        const prevSet = new Set(prevTanks);
-                        let bestIdx = 0, bestScore = -1;
-                        newSlides.forEach((s, i) => {
-                            const tanks = (s.dataset.tanks || '').split(',').filter(Boolean);
-                            const score = tanks.reduce((acc, t) => acc + (prevSet.has(t) ? 1 : 0), 0);
-                            if (score > bestScore) { bestScore = score; bestIdx = i; }
-                        });
-                        newIndex = bestIdx;
-                    }
-                }
-            }
-
-            newSlides.forEach(s => s.classList.remove('active'));
-            if (newSlides[newIndex]) {
-                newSlides[newIndex].classList.add('active');
-                currentSlideIndex = newIndex;
-                currentSlideKey = newSlides[newIndex].dataset.key;
-            }
-
-            container.offsetHeight; // reflow
-            container.classList.remove('no-anim');
-        }
-
-        function getLimitsFor(tankName, datasetLabel) {
-            const lim = chartsControlLimits?.[tankName];
-            if (!lim) return null;
-            if (typeof lim.min === 'number' || typeof lim.max === 'number') return lim;
-
-            const nLabel = normalize(datasetLabel);
-            for (const key of Object.keys(lim)) {
-                const nKey = normalize(key);
-                if (nKey === nLabel || nKey.includes(nLabel) || nLabel.includes(nKey)) {
-                    return lim[key];
-                }
-            }
-            return lim[Object.keys(lim)[0]];
+            currentSlideIndex = 0;
         }
 
         function renderChart(id, chartData, tankName) {
@@ -553,9 +403,14 @@
 
             const labels = Array.isArray(chartData?.labels) ? chartData.labels : [];
             const dsArr = Array.isArray(chartData?.datasets) ? chartData.datasets : [];
-            if (dsArr.length === 0) return;
+            if (dsArr.length === 0) {
+                // Sem datasets, não renderiza
+                return;
+            }
 
-            // Anotação (faixa ideal)
+            // Prepara anotações (faixa ideal)
+            // - Para tanques simples: usa min/max direto
+            // - Para multi-parâmetro: tenta casar com o label do 1º dataset; se não achar, usa o 1º disponível
             let ann = {};
             const firstLabel = dsArr[0]?.label ?? '';
             const limits = getLimitsFor(tankName, firstLabel);
@@ -576,17 +431,16 @@
                 data: {
                     labels,
                     datasets: dsArr.map((ds, i) => {
-                        const seriesLabel = ds?.label ?? `Série ${i + 1}`;
-                        const color = getSeriesColor(tankName, seriesLabel, i);
+                        const color = wegColors[i % wegColors.length];
                         const dataPoints = Array.isArray(ds?.data) ? ds.data.map(toNumber) : [];
                         return {
-                            label: seriesLabel,
+                            label: ds?.label ?? `Série ${i + 1}`,
                             data: dataPoints,
                             borderColor: color,
-                            pointBackgroundColor: color,
-                            backgroundColor: i === 0 ? hexToRgba(color, 0.08) : 'transparent',
+                            backgroundColor: i === 0 ? 'rgba(0, 87, 157, 0.05)' : 'transparent',
                             borderWidth: 4,
                             pointRadius: 6,
+                            pointBackgroundColor: color,
                             tension: 0.3,
                             fill: i === 0
                         };
@@ -603,8 +457,14 @@
                         annotation: { annotations: ann }
                     },
                     scales: {
-                        y: { grid: { color: '#eee' }, ticks: { color: '#666', font: { weight: 'bold' } } },
-                        x: { grid: { display: false }, ticks: { color: '#666', font: { weight: 'bold' } } }
+                        y: {
+                            grid: { color: '#eee' },
+                            ticks: { color: '#666', font: { weight: 'bold' } }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#666', font: { weight: 'bold' } }
+                        }
                     }
                 }
             };
@@ -622,9 +482,7 @@
             if (slides.length <= 1) return;
             slides[currentSlideIndex].classList.remove('active');
             currentSlideIndex = (currentSlideIndex + 1) % slides.length;
-            const active = slides[currentSlideIndex];
-            active.classList.add('active');
-            currentSlideKey = active?.dataset?.key || null;
+            slides[currentSlideIndex].classList.add('active');
         }
 
         function updateClock() {
@@ -638,7 +496,7 @@
         // Timers
         setInterval(updateClock, 1000);
         setInterval(nextSlide, 20000);
-        setInterval(fetchData, 60000); // se quiser, mude para 61000 para “destravar” dos 20s do carrossel
+        setInterval(fetchData, 60000);
 
         // Boot
         updateClock();
