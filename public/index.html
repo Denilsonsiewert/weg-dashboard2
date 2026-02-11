@@ -184,62 +184,24 @@
     // Paleta fallback (se não houver mapeamento da série)
     const wegColors = ['#00579d', '#00a1e4', '#58595b', '#808285'];
 
-    // Mapa de cores por Tanque -> Série (ajuste conforme preferir)
-    const colorMap = {
-      "Estanhagem A": {
-        "Sn (g/L)":      "#00579D",
-        "H2SO4 (mL/L)":  "#FF7F0E"
-      },
-      "Estanhagem B": {
-        "Sn (g/L)":      "#00579D",
-        "H2SO4 (mL/L)":  "#FF7F0E"
-      },
-      "Níquel WATT": {
-        "Niº (g/L)":     "#00579D",
-        "NiCl2 (mL/L)":  "#00A1E4",
-        "H3BO3 (g/L)":   "#9467BD"
-      },
+    // ======= CORES =======
+
+    // Mapa de cores "padrão" por Tanque -> Série (fallback)
+    const defaultColorMap = {
+      "Estanhagem A": { "Sn (g/L)": "#00579D", "H2SO4 (mL/L)": "#FF7F0E" },
+      "Estanhagem B": { "Sn (g/L)": "#00579D", "H2SO4 (mL/L)": "#FF7F0E" },
+      "Níquel WATT":  { "Niº (g/L)": "#00579D", "NiCl2 (mL/L)": "#00A1E4", "H3BO3 (g/L)": "#9467BD" },
       "Desengraxante": {
-        "Concentração":                 "#00579D",
+        "Concentração": "#00579D",
         "Concentração do banho (mL/L)": "#00579D"
       },
-      "Ativação - Tanque 5": {
-        "pH":        "#00A1E4",
-        "pH do banho":"#00A1E4"
-      },
-      "Ativação - Tanque 6": {
-        "Concentração (mL/L)":          "#00579D",
-        "Concentração do banho (mL/L)": "#00579D"
-      },
-      "Selante": {
-        "Concentração (%)": "#00A1E4",
-        "Concentração":     "#00A1E4"
-      }
+      "Ativação - Tanque 5": { "pH": "#00A1E4", "pH do banho": "#00A1E4" },
+      "Ativação - Tanque 6": { "Concentração (mL/L)": "#00579D", "Concentração do banho (mL/L)": "#00579D" },
+      "Selante": { "Concentração (%)": "#00A1E4", "Concentração": "#00A1E4" }
     };
 
-    // Limites de controle (mantidos do seu padrão)
-    const chartsControlLimits = {
-      "Desengraxante": { min: 30, max: 40 },
-      "Ativação - Tanque 5": { min: 0.5, max: 1.5 },
-      "Ativação - Tanque 6": { min: 30, max: 40 },
-      "Níquel WATT": {
-        "Niº (g/L)":   { min: 60, max: 80 },
-        "NiCl2 (mL/L)":{ min: 50, max: 70 },
-        "H3BO3 (g/L)": { min: 35, max: 45 }
-      },
-      "Estanhagem A": {
-        "Sn (g/L)":    { min: 20, max: 30 },
-        "H2SO4 (mL/L)":{" min": 50, "max": 70 }
-      },
-      "Estanhagem B": {
-        "Sn (g/L)":    { min: 20, max: 30 },
-        "H2SO4 (mL/L)":{" min": 50, "max": 70 }
-      }
-    };
-
-    // Mantém chave estável do slide ativo e último timestamp
-    let currentSlideKey = null;
-    let lastTimestamp = null;
+    // Mapa carregado do Excel (sobrescreve o default quando existir)
+    const excelColorMap = {}; // { tankKey: { seriesKey: "#RRGGBB" } }
 
     // ---------------- Helpers gerais ----------------
     const normalize = (s) => (s ?? '')
@@ -250,27 +212,20 @@
       .trim()
       .toLowerCase();
 
+    const slug = (s) => (s ?? '')
+      .toString()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^\w\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-')
+      .toLowerCase();
+
     function hexToRgba(hex, alpha = 0.1) {
-      const h = hex.replace('#', '');
-      const bigint = parseInt(h, 16);
-      if (h.length !== 6 || Number.isNaN(bigint)) return `rgba(0,0,0,${alpha})`;
-      const r = (bigint >> 16) & 255;
-      const g = (bigint >> 8) & 255;
-      const b = bigint & 255;
+      const h = (hex || '').replace('#', '');
+      const n = parseInt(h, 16);
+      if (h.length !== 6 || Number.isNaN(n)) return `rgba(0,0,0,${alpha})`;
+      const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
       return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    }
-
-    function getSeriesColor(tankName, seriesLabel, fallbackIndex) {
-      const t = colorMap[tankName] || null;
-      if (!t) return wegColors[fallbackIndex % wegColors.length];
-      if (t[seriesLabel]) return t[seriesLabel];
-
-      const nLabel = normalize(seriesLabel);
-      for (const [key, val] of Object.entries(t)) {
-        const nk = normalize(key);
-        if (nk === nLabel || nk.includes(nLabel) || nLabel.includes(nk)) return val;
-      }
-      return wegColors[fallbackIndex % wegColors.length];
     }
 
     function toNumber(v) {
@@ -281,39 +236,7 @@
       return Number.isFinite(n) ? n : null;
     }
 
-    const slug = (s) => (s ?? '')
-      .toString()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^\w\s-]/g, '')
-      .trim()
-      .replace(/\s+/g, '-')
-      .toLowerCase();
-
-    function slideKey(slideObj) {
-      if (slideObj.tipo === 'capa') return 'capa';
-      const nomes = (slideObj.dados || []).map(d => d?.nome || '').map(slug);
-      return `analise:${nomes.join('|')}`;
-    }
-
-    function slideTanks(slideObj) {
-      if (slideObj.tipo === 'capa') return ['capa'];
-      return (slideObj.dados || []).map(d => slug(d?.nome || ''));
-    }
-
-    function buildSlidesData(cache) {
-      const analisesAll = Array.isArray(cache?.analises) ? cache.analises : [];
-      const capa = analisesAll.find(a => a?.tipo === 'capa');
-      const analises = analisesAll.filter(a => a?.tipo === 'analise');
-
-      const slidesData = [];
-      if (capa) slidesData.push({ tipo: 'capa', dados: capa });
-      for (let i = 0; i < analises.length; i += 2) {
-        slidesData.push({ tipo: 'analise', dados: analises.slice(i, i + 2) });
-      }
-      return slidesData;
-    }
-
-    // --- Rotulagem curta e unidade no cabeçalho da tabela ---
+    // ======= HEADERS DE TABELA =======
     function headerShort(label = '') {
       const l = normalize(label);
       if (/^nicl2/.test(l)) return 'NiCl2';
@@ -349,7 +272,118 @@
       return s !== '' && !Number.isNaN(Number(s));
     }
 
-    // ---------------- Fetch de dados ----------------
+    // ======= CARREGAMENTO DE CORES DO EXCEL =======
+    // Entrada esperada: { cores: [ { Tanque, Serie, CorHex }, ... ] }
+    function applyExcelColors(coresArray) {
+      if (!Array.isArray(coresArray)) return;
+      coresArray.forEach(item => {
+        const tank = (item.Tanque ?? item.tanque ?? '').toString().trim();
+        const serie = (item.Serie ?? item.serie ?? '').toString().trim();
+        let hex = (item.CorHex ?? item.cor ?? item.hex ?? '').toString().trim();
+
+        if (!tank || !serie || !hex) return;
+        if (!/^#?[0-9a-f]{6}$/i.test(hex)) return;
+        if (hex[0] !== '#') hex = '#' + hex;
+
+        const tKey = tank;           // mantemos a chave “humana”
+        const sKey = serie;
+
+        if (!excelColorMap[tKey]) excelColorMap[tKey] = {};
+        excelColorMap[tKey][sKey] = hex;
+      });
+      console.info('[Cores] Excel color map aplicado:', excelColorMap);
+    }
+
+    async function fetchExcelColors() {
+      try {
+        const base = (window.location && window.location.origin && window.location.origin !== 'null')
+          ? window.location.origin : '';
+        const URL = base + '/api/cores';
+        const res = await fetch(URL, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        if (Array.isArray(json?.cores)) applyExcelColors(json.cores);
+      } catch (e) {
+        console.warn('[Cores] Não foi possível obter /api/cores:', e.message);
+      }
+    }
+
+    // Resolvedor de cor (prioridade: Excel -> default -> paleta)
+    function getSeriesColor(tankName, seriesLabel, fallbackIndex) {
+      // 1) Excel color map (match exato, depois normalizado)
+      const tExcel = excelColorMap[tankName];
+      if (tExcel) {
+        if (tExcel[seriesLabel]) return tExcel[seriesLabel];
+        const nLabel = normalize(seriesLabel);
+        for (const [k, v] of Object.entries(tExcel)) {
+          const nk = normalize(k);
+          if (nk === nLabel || nk.includes(nLabel) || nLabel.includes(nk)) return v;
+        }
+      }
+      // 2) Default map
+      const t = defaultColorMap[tankName];
+      if (t) {
+        if (t[seriesLabel]) return t[seriesLabel];
+        const nLabel = normalize(seriesLabel);
+        for (const [k, v] of Object.entries(t)) {
+          const nk = normalize(k);
+          if (nk === nLabel || nk.includes(nLabel) || nLabel.includes(nk)) return v;
+        }
+      }
+      // 3) Fallback
+      return wegColors[fallbackIndex % wegColors.length];
+    }
+
+    // ======= LIMITES DE CONTROLE =======
+    const chartsControlLimits = {
+      "Desengraxante": { min: 30, max: 40 },
+      "Ativação - Tanque 5": { min: 0.5, max: 1.5 },
+      "Ativação - Tanque 6": { min: 30, max: 40 },
+      "Níquel WATT": {
+        "Niº (g/L)":   { min: 60, max: 80 },
+        "NiCl2 (mL/L)":{ min: 50, max: 70 },
+        "H3BO3 (g/L)": { min: 35, max: 45 }
+      },
+      "Estanhagem A": {
+        "Sn (g/L)":    { min: 20, max: 30 },
+        "H2SO4 (mL/L)":{ min: 50, max: 70 }
+      },
+      "Estanhagem B": {
+        "Sn (g/L)":    { min: 20, max: 30 },
+        "H2SO4 (mL/L)":{ min: 50, max: 70 }
+      }
+    };
+
+    // Mantém chave estável do slide ativo e último timestamp
+    let currentSlideKey = null;
+    let lastTimestamp = null;
+
+    // ======= SLIDES =======
+    function slideKey(slideObj) {
+      if (slideObj.tipo === 'capa') return 'capa';
+      const nomes = (slideObj.dados || []).map(d => d?.nome || '').map(slug);
+      return `analise:${nomes.join('|')}`;
+    }
+
+    function slideTanks(slideObj) {
+      if (slideObj.tipo === 'capa') return ['capa'];
+      return (slideObj.dados || []).map(d => slug(d?.nome || ''));
+    }
+
+    function buildSlidesData(cache) {
+      const analisesAll = Array.isArray(cache?.analises) ? cache.analises : [];
+      const capa = analisesAll.find(a => a?.tipo === 'capa');
+      const analises = analisesAll.filter(a => a?.tipo === 'analise');
+
+      const slidesData = [];
+      if (capa) slidesData.push({ tipo: 'capa', dados: capa });
+      for (let i = 0; i < analises.length; i += 2) {
+        slidesData.push({ tipo: 'analise', dados: analises.slice(i, i + 2) });
+      }
+      return slidesData;
+    }
+
+    // ======= FETCH =======
     async function fetchData() {
       try {
         const base = (window.location && window.location.origin && window.location.origin !== 'null')
@@ -361,6 +395,9 @@
 
         const json = await res.json();
         const ts = json?.timestamp ? new Date(json.timestamp) : new Date();
+
+        // Se vierem cores embutidas no payload, aplica
+        if (Array.isArray(json?.cores)) applyExcelColors(json.cores);
 
         // Evita reconstruir se nada mudou
         if (lastTimestamp && new Date(lastTimestamp).getTime() === ts.getTime()) {
@@ -390,7 +427,6 @@
       chartsRegistry.clear();
     }
 
-    // ---------------- Montagem dos slides ----------------
     function setupSlides({ preserveActive = true } = {}) {
       const container = document.getElementById('slides');
 
@@ -402,8 +438,6 @@
         if (slides.length) {
           const active = slides[currentSlideIndex] || slides[0];
           prevKey = active?.dataset?.key || currentSlideKey;
-
-          // Tanques do slide ativo atual (lendo títulos)
           const titles = Array.from(active?.querySelectorAll('.card .card-title') || [])
             .map(el => slug(el.textContent || ''))
             .filter(s => s && s !== 'resumo-de-status-das-analises');
@@ -558,7 +592,7 @@
       container.classList.remove('no-anim');
     }
 
-    // ---------------- Gráficos ----------------
+    // ======= LIMITES =======
     function getLimitsFor(tankName, datasetLabel) {
       const lim = chartsControlLimits?.[tankName];
       if (!lim) return null;
@@ -574,6 +608,7 @@
       return lim[Object.keys(lim)[0]];
     }
 
+    // ======= GRÁFICOS =======
     function renderChart(id, chartData, tankName) {
       const canvas = document.getElementById(id);
       if (!canvas) return;
@@ -586,7 +621,608 @@
       let ann = {};
       const firstLabel = dsArr[0]?.label ?? '';
       const limits = getLimitsFor(tankName, firstLabel);
+      if (limits &&Óml`)** atualizado para:
+  - carregar um **`colorMap` via `/api/cores`** (se existir),
+  - manter o **mapa padrão** caso o endpoint não esteja disponível,
+  - e **preservar** todas as melhorias anteriores (carrossel estável, cabeçalhos alinhados, unidades, colgroup, tipografia tabular etc.).
+- **Back-end (duas opções)** para expor `/api/cores`:
+  1) **Python/Flask** lendo a aba **`Cores`** (Tanque, Serie, CorHex) e, se ela não existir, **tentando inferir** pelos preenchimentos (fills) dos cabeçalhos (quando houver).  
+  2) **Node/Express** fazendo o mesmo (para quem usa Node).
 
+> Observação: no seu arquivo enviado, há abas como **Ana. Estanhagem A**, **Graf.Estanhagem.A**, **Ana. Estanhagem B**, **Ana. Níquel WATT**, **Graf.Níquel.WATT**, etc., portanto deixar o endpoint preparado para essas nomenclaturas já te atende. [1](https://weg365-my.sharepoint.com/personal/denilsons_weg_net/_layouts/15/Doc.aspx?sourcedoc=%7B60628760-41D3-4B30-A6EB-991A20B3007A%7D&file=Controle%20Anal%C3%ADtico%20da%20Estanhagem%20-%20JGS.xlsm&action=default&mobileredirect=true)
+
+---
+
+## ✅ `index.html` (versão completa, “colável”)
+
+> Substitua o arquivo atual por este.  
+> **Novidade**: a função `fetchColors()` carrega e **mescla** o mapa de cores do Excel (se o endpoint `/api/cores` estiver ativo).
+
+```html
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>WEG - Controle Analítico Estanhagem</title>
+
+  <!-- Chart.js + Plugin de Anotação -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+
+  <style>
+    :root {
+      --weg-blue: #00579d;
+      --weg-light-blue: #e6f0f9;
+      --weg-gray: #58595b;
+      --success: #28a745;
+      --danger: #dc3545;
+      --white: #ffffff;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f4f7f9;
+      color: var(--weg-gray);
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      background: var(--white);
+      padding: 15px 40px;
+      display: grid;
+      grid-template-columns: 200px 1fr 200px;
+      align-items: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      border-bottom: 4px solid var(--weg-blue);
+      z-index: 100;
+    }
+
+    .logo-weg { height: 50px; }
+    .header-title {
+      font-size: 1.8em;
+      font-weight: 700;
+      color: var(--weg-blue);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      text-align: center;
+    }
+
+    .header-right { text-align: right; }
+    #clock { font-size: 1.4em; font-weight: 600; color: var(--weg-blue); }
+    #date  { font-size: 0.9em; color: var(--weg-gray); }
+
+    .slide-container {
+      flex: 1;
+      position: relative;
+      padding: 30px;
+      background: linear-gradient(180deg, #f4f7f9 0%, #e9eff5 100%);
+    }
+
+    .slide {
+      position: absolute;
+      top: 30px; left: 30px; right: 30px; bottom: 30px;
+      display: none;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      animation: slideIn 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+    }
+
+    .slide.active { display: grid; }
+    .slide.full-slide { grid-template-columns: 1fr; }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .card {
+      background: var(--white);
+      border-radius: 12px;
+      padding: 25px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+      display: flex;
+      flex-direction: column;
+      border: 1px solid rgba(0,87,157,0.1);
+    }
+
+    .card-title {
+      color: var(--weg-blue);
+      font-size: 1.6em;
+      font-weight: 700;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--weg-light-blue);
+      text-align: center;
+    }
+
+    .chart-wrapper { flex: 1; min-height: 0; margin-bottom: 20px; }
+
+    /* --- Tabelas: alinhamento sólido de títulos e dados --- */
+    table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 1.2em; table-layout: fixed; }
+    th    { background-color: var(--weg-light-blue); color: var(--weg-blue); padding: 15px; text-align: center; font-weight: 600; border-bottom: 2px solid var(--weg-blue); }
+    td    { padding: 15px; border-bottom: 1px solid #eee; color: #333; text-align: center; }
+    tr:nth-child(even) { background-color: #fafafa; }
+
+    th .th-main { font-weight: 700; line-height: 1.1; }
+    th .th-sub  { margin-top: 2px; font-size: 0.75em; color: #808285; font-weight: 600; line-height: 1; }
+    .numeric    { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+
+    .status-badge {
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-weight: 700;
+      font-size: 0.9em;
+      text-transform: uppercase;
+      display: inline-block;
+    }
+
+    .status-atrasado { background-color: #ffebee; color: var(--danger);  border: 1px solid var(--danger); }
+    .status-ok       { background-color: #e8f5e9; color: var(--success); border: 1px solid var(--success); }
+
+    .footer {
+      background: var(--white);
+      padding: 10px 40px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.9em;
+      color: var(--weg-gray);
+      border-top: 1px solid #ddd;
+    }
+
+    .sync-indicator { display: flex; align-items: center; gap: 8px; }
+    .dot { width: 10px; height: 10px; background: var(--success); border-radius: 50%; animation: pulse 2s infinite; }
+
+    @keyframes pulse {
+      0%   { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
+      70%  { transform: scale(1);    box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+    }
+
+    /* Desativa a animação de entrada apenas durante refresh de dados */
+    .no-anim .slide { animation: none !important; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <img src="weg_logo.png" alt="WEG Logo" class="logo-weg"
+         onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Weg_logo.svg/1200px-Weg_logo.svg.png'">
+    <div class="header-title">Controle Analítico Estanhagem</div>
+    <div class="header-right">
+      <div id="clock">00:00:00</div>
+      <div id="date">--/--/----</div>
+    </div>
+  </header>
+
+  <main class="slide-container" id="slides"></main>
+
+  <footer class="footer">
+    <div class="sync-indicator">
+      <div class="dot"></div>
+      <span id="lastUpdate">Sincronizando dados...</span>
+    </div>
+    <div>Monitoramento em Tempo Real - WEG Industrial</div>
+  </footer>
+
+  <script>
+    // --- Registro do plugin de anotação (necessário em Chart.js v4) ---
+    try { if (window.Chart && (window['chartjs-plugin-annotation'] || window.ChartAnnotation)) {
+      Chart.register(window['chartjs-plugin-annotation'] || window.ChartAnnotation);
+    }} catch (e) { console.warn('Falha ao registrar plugin de anotação:', e); }
+
+    let currentSlideIndex = 0;
+    let dataCache = null;
+    const chartsRegistry = new Map(); // id -> Chart instance
+
+    // Paleta fallback (se não houver mapeamento da série)
+    const wegColors = ['#00579d', '#00a1e4', '#58595b', '#808285'];
+
+    // Mapa de cores por Tanque -> Série (padrão; será SOBRESCRITO pelo /api/cores se existir)
+    const colorMap = {
+      "Estanhagem A": { "Sn (g/L)": "#00579D", "H2SO4 (mL/L)": "#FF7F0E" },
+      "Estanhagem B": { "Sn (g/L)": "#00579D", "H2SO4 (mL/L)": "#FF7F0E" },
+      "Níquel WATT":  { "Niº (g/L)": "#00579D", "NiCl2 (mL/L)": "#00A1E4", "H3BO3 (g/L)": "#9467BD" },
+      "Desengraxante":{ "Concentração": "#00579D", "Concentração do banho (mL/L)": "#00579D" },
+      "Ativação - Tanque 5": { "pH": "#00A1E4", "pH do banho": "#00A1E4" },
+      "Ativação - Tanque 6": { "Concentração (mL/L)": "#00579D", "Concentração do banho (mL/L)": "#00579D" },
+      "Selante": { "Concentração (%)": "#00A1E4", "Concentração": "#00A1E4" }
+    };
+
+    // Limites de controle (mantidos do seu padrão)
+    const chartsControlLimits = {
+      "Desengraxante": { min: 30, max: 40 },
+      "Ativação - Tanque 5": { min: 0.5, max: 1.5 },
+      "Ativação - Tanque 6": { min: 30, max: 40 },
+      "Níquel WATT": {
+        "Niº (g/L)":   { min: 60, max: 80 },
+        "NiCl2 (mL/L)":{ min: 50, max: 70 },
+        "H3BO3 (g/L)": { min: 35, max: 45 }
+      },
+      "Estanhagem A": {
+        "Sn (g/L)":    { min: 20, max: 30 },
+        "H2SO4 (mL/L)":{" min": 50, "max": 70 }
+      },
+      "Estanhagem B": {
+        "Sn (g/L)":    { min: 20, max: 30 },
+        "H2SO4 (mL/L)":{" min": 50, "max": 70 }
+      }
+    };
+
+    // Mantém chave do slide ativo e último timestamp
+    let currentSlideKey = null;
+    let lastTimestamp = null;
+
+    // ---------------- Helpers gerais ----------------
+    const normalize = (s) => (s ?? '')
+      .toString()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[º°]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+
+    function hexToRgba(hex, alpha = 0.1) {
+      const h = hex.replace('#', '');
+      const bigint = parseInt(h, 16);
+      if (h.length !== 6 || Number.isNaN(bigint)) return `rgba(0,0,0,${alpha})`;
+      const r = (bigint >> 16) & 255, g = (bigint >> 8) & 255, b = bigint & 255;
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    function deepMergeColorMap(base, override) {
+      if (!override || typeof override !== 'object') return base;
+      const out = JSON.parse(JSON.stringify(base));
+      for (const [tank, seriesObj] of Object.entries(override)) {
+        if (!out[tank]) out[tank] = {};
+        for (const [serie, hex] of Object.entries(seriesObj || {})) {
+          if (typeof hex === 'string' && /^#([0-9a-f]{6})$/i.test(hex.trim())) {
+            out[tank][serie] = hex.trim();
+          }
+        }
+      }
+      return out;
+    }
+
+    function getSeriesColor(tankName, seriesLabel, fallbackIndex) {
+      const t = colorMap[tankName] || null;
+      if (!t) return wegColors[fallbackIndex % wegColors.length];
+      if (t[seriesLabel]) return t[seriesLabel];
+
+      const nLabel = normalize(seriesLabel);
+      for (const [key, val] of Object.entries(t)) {
+        const nk = normalize(key);
+        if (nk === nLabel || nk.includes(nLabel) || nLabel.includes(nk)) return val;
+      }
+      return wegColors[fallbackIndex % wegColors.length];
+    }
+
+    function toNumber(v) {
+      if (typeof v === 'number') return v;
+      if (v == null) return null;
+      const s = String(v).replace(',', '.').trim();
+      const n = Number(s);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    const slug = (s) => (s ?? '')
+      .toString()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^\w\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-')
+      .toLowerCase();
+
+    function slideKey(slideObj) {
+      if (slideObj.tipo === 'capa') return 'capa';
+      const nomes = (slideObj.dados || []).map(d => d?.nome || '').map(slug);
+      return `analise:${nomes.join('|')}`;
+    }
+
+    function slideTanks(slideObj) {
+      if (slideObj.tipo === 'capa') return ['capa'];
+      return (slideObj.dados || []).map(d => slug(d?.nome || ''));
+    }
+
+    function buildSlidesData(cache) {
+      const analisesAll = Array.isArray(cache?.analises) ? cache.analises : [];
+      const capa = analisesAll.find(a => a?.tipo === 'capa');
+      const analises = analisesAll.filter(a => a?.tipo === 'analise');
+
+      const slidesData = [];
+      if (capa) slidesData.push({ tipo: 'capa', dados: capa });
+      for (let i = 0; i < analises.length; i += 2) {
+        slidesData.push({ tipo: 'analise', dados: analises.slice(i, i + 2) });
+      }
+      return slidesData;
+    }
+
+    // --- Rotulagem curta e unidade no cabeçalho da tabela ---
+    function headerShort(label = '') {
+      const l = normalize(label);
+      if (/^nicl2/.test(l)) return 'NiCl2';
+      if (/^ni(º|o)/.test(l) || l.includes('niº')) return 'Niº';
+      if (l.includes('h3bo3')) return 'H3BO3';
+      if (l.includes('h2so4')) return 'H2SO4';
+      if (l.startsWith('ph'))  return 'pH';
+      if (l.includes('sn'))    return 'Sn';
+      if (l.includes('concentração do banho') || l.includes('concentracao do banho')) return 'Concentração';
+      return (label || '').split(' ')[0] || '—';
+    }
+
+    function headerUnit(label = '') {
+      const l = normalize(label);
+      if (l.includes('(g/l)'))  return '(g/L)';
+      if (l.includes('(ml/l)')) return '(mL/L)';
+      if (l.includes('%'))      return '(%)';
+      if (l.startsWith('ph'))   return '';
+      return '';
+    }
+
+    function getTableColgroupHtml(dsCount) {
+      const dateWidth = dsCount <= 2 ? 40 : (dsCount === 3 ? 32 : 28);
+      const each = ((100 - dateWidth) / dsCount).toFixed(2);
+      const cols = [`<col style="width:${dateWidth}%">`];
+      for (let i = 0; i < dsCount; i++) cols.push(`<col style="width:${each}%">`);
+      return `<colgroup>${cols.join('')}</colgroup>`;
+    }
+
+    function isNumericLike(v) {
+      if (v == null) return false;
+      const s = String(v).replace(',', '.').trim();
+      return s !== '' && !Number.isNaN(Number(s));
+    }
+
+    // ---------------- LER CORES DO EXCEL via /api/cores ----------------
+    async function fetchColors() {
+      try {
+        const base = (window.location && window.location.origin && window.location.origin !== 'null')
+          ? window.location.origin : '';
+        const url = base + '/api/cores';
+        const res = await fetch(url, { cache: 'no-store' });
+        if (!res.ok) return;
+
+        const json = await res.json(); // { colors: { Tanque: { Serie: "#RRGGBB" } }, source: "Cores"|"infer" }
+        if (json && json.colors && typeof json.colors === 'object') {
+          const merged = deepMergeColorMap(colorMap, json.colors);
+          // aplica override
+          for (const [tank, series] of Object.entries(merged)) {
+            colorMap[tank] = series;
+          }
+          console.log('[cores] mapa aplicado da fonte:', json.source || 'desconhecida');
+        }
+      } catch (e) {
+        // Silencioso: se não der, usamos o mapa padrão
+        console.warn('Não foi possível carregar /api/cores. Usando mapa padrão.', e);
+      }
+    }
+
+    // ---------------- Fetch de dados ----------------
+    async function fetchData() {
+      try {
+        const base = (window.location && window.location.origin && window.location.origin !== 'null')
+          ? window.location.origin : '';
+        const API_URL = base + '/api/dados';
+
+        const res = await fetch(API_URL, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const json = await res.json();
+        const ts = json?.timestamp ? new Date(json.timestamp) : new Date();
+
+        if (lastTimestamp && new Date(lastTimestamp).getTime() === ts.getTime()) {
+          document.getElementById('lastUpdate').textContent =
+            `Última Atualização: ${ts.toLocaleString('pt-BR')} (sem alterações)`;
+          return;
+        }
+
+        dataCache = json;
+        lastTimestamp = ts.toISOString();
+
+        document.getElementById('lastUpdate').textContent =
+          `Última Atualização: ${ts.toLocaleString('pt-BR')}`;
+
+        setupSlides({ preserveActive: true });
+
+      } catch (e) {
+        console.error("Erro ao buscar dados", e);
+        document.getElementById('lastUpdate').textContent = 'Erro ao carregar dados. Aguardando Excel...';
+      }
+    }
+
+    function destroyAllCharts() {
+      for (const [, chart] of chartsRegistry) { try { chart.destroy(); } catch {} }
+      chartsRegistry.clear();
+    }
+
+    // ---------------- Montagem dos slides ----------------
+    function setupSlides({ preserveActive = true } = {}) {
+      const container = document.getElementById('slides');
+
+      let prevKey = null, prevTanks = [];
+      if (preserveActive) {
+        const slides = document.querySelectorAll('.slide');
+        if (slides.length) {
+          const active = slides[currentSlideIndex] || slides[0];
+          prevKey = active?.dataset?.key || currentSlideKey;
+          const titles = Array.from(active?.querySelectorAll('.card .card-title') || [])
+            .map(el => slug(el.textContent || ''))
+            .filter(s => s && s !== 'resumo-de-status-das-analises');
+          prevTanks = titles.length ? titles : (prevKey ? [prevKey] : []);
+        }
+      }
+
+      const slidesData = buildSlidesData(dataCache);
+
+      destroyAllCharts();
+      container.classList.add('no-anim');
+      container.innerHTML = '';
+
+      if (slidesData.length === 0) {
+        const noSlide = document.createElement('div');
+        noSlide.className = 'slide active full-slide';
+        noSlide.dataset.key = 'sem-dados';
+        noSlide.dataset.tanks = 'sem-dados';
+        noSlide.innerHTML = `
+          <div class="card">
+            <div class="card-title">Sem dados disponíveis</div>
+            <div style="flex:1;display:flex;align-items:center;justify-content:center;color:#666;">
+              Aguarde a sincronização com o Excel/API.
+            </div>
+          </div>`;
+        container.appendChild(noSlide);
+        currentSlideIndex = 0;
+        currentSlideKey = 'sem-dados';
+        container.offsetHeight;
+        container.classList.remove('no-anim');
+        return;
+      }
+
+      const newSlides = [];
+      slidesData.forEach((slideObj) => {
+        const slide = document.createElement('div');
+        slide.className = 'slide';
+
+        const key   = slideKey(slideObj);
+        const tanks = slideTanks(slideObj);
+
+        slide.dataset.key   = key;
+        slide.dataset.tanks = tanks.join(',');
+
+        if (slideObj.tipo === 'capa') {
+          slide.classList.add('full-slide');
+          const statusData = Array.isArray(slideObj.dados?.status_data) ? slideObj.dados.status_data : [];
+          const rows = statusData.map(s => `
+            <tr>
+              <td style="font-weight:700;color:var(--weg-blue);text-align:left;">${s?.tanque ?? '-'}</td>
+              <td style="text-align:center;font-weight:600;">${s?.proxima ?? '-'}</td>
+              <td style="text-align:center;">
+                <span class="status-badge ${(s?.status || '').includes('ATRASADO') ? 'status-atrasado' : 'status-ok'}">
+                  ${s?.status ?? '—'}
+                </span>
+              </td>
+            </tr>`).join('');
+
+          slide.innerHTML = `
+            <div class="card">
+              <div class="card-title">Resumo de Status das Análises</div>
+              <div style="flex:1;display:flex;align-items:center;">
+                <table>
+                  <thead>
+                    <tr>
+                      <th style="text-align:left;">EQUIPAMENTO / TANQUE</th>
+                      <th style="text-align:center;">PRÓXIMA ANÁLISE</th>
+                      <th style="text-align:center;">STATUS ATUAL</th>
+                    </tr>
+                  </thead>
+                  <tbody>${rows}</tbody>
+                </table>
+              </div>
+            </div>`;
+        } else {
+          const cards = Array.isArray(slideObj.dados) ? slideObj.dados : [];
+          cards.forEach((ana) => {
+            const card = document.createElement('div');
+            card.className = 'card';
+
+            const canvasId = `chart-${slug(ana?.nome)}`;
+            const dsArr = Array.isArray(ana?.chart_data?.datasets) ? ana.chart_data.datasets : [];
+
+            const headers = dsArr.map(ds => {
+              const raw  = (ds?.label ?? '').toString();
+              const main = headerShort(raw);
+              const unit = headerUnit(raw);
+              return `<th><div class="th-main">${main}</div>${unit ? `<div class="th-sub">${unit}</div>` : ''}</th>`;
+            }).join('');
+
+            const ult = Array.isArray(ana?.ultimas_analises) ? ana.ultimas_analises : [];
+            const rows = ult.map(r => {
+              let vals = '';
+              for (let k = 1; k <= dsArr.length; k++) {
+                const val = r?.[`Val${k}`];
+                const cls = isNumericLike(val) ? 'numeric' : '';
+                vals += `<td class="${cls}">${val ?? '—'}</td>`;
+              }
+              return `<tr><td style="font-weight:600;">${r?.Data ?? '-'}</td>${vals}</tr>`;
+            }).join('');
+
+            card.innerHTML = `
+              <div class="card-title">${ana?.nome ?? '—'}</div>
+              <div class="chart-wrapper"><canvas id="${canvasId}"></canvas></div>
+              <table>
+                ${getTableColgroupHtml(dsArr.length)}
+                <thead><tr><th>DATA</th>${headers}</tr></thead>
+                <tbody>${rows}</tbody>
+              </table>`;
+
+            requestAnimationFrame(() => renderChart(canvasId, ana?.chart_data, ana?.nome));
+            slide.appendChild(card);
+          });
+        }
+
+        container.appendChild(slide);
+        newSlides.push(slide);
+      });
+
+      let newIndex = 0;
+      if (preserveActive) {
+        if (prevKey) {
+          const idxByKey = newSlides.findIndex(s => s.dataset.key === prevKey);
+          if (idxByKey >= 0) newIndex = idxByKey;
+          else {
+            const prevSet = new Set(prevTanks);
+            let bestIdx = 0, bestScore = -1;
+            newSlides.forEach((s, i) => {
+              const tanks = (s.dataset.tanks || '').split(',').filter(Boolean);
+              const score = tanks.reduce((acc, t) => acc + (prevSet.has(t) ? 1 : 0), 0);
+              if (score > bestScore) { bestScore = score; bestIdx = i; }
+            });
+            newIndex = bestIdx;
+          }
+        }
+      }
+
+      newSlides.forEach(s => s.classList.remove('active'));
+      if (newSlides[newIndex]) {
+        newSlides[newIndex].classList.add('active');
+        currentSlideIndex = newIndex;
+        currentSlideKey   = newSlides[newIndex].dataset.key;
+      }
+
+      container.offsetHeight; // reflow
+      container.classList.remove('no-anim');
+    }
+
+    // ---------------- Gráficos ----------------
+    function getLimitsFor(tankName, datasetLabel) {
+      const lim = chartsControlLimits?.[tankName];
+      if (!lim) return null;
+      if (typeof lim.min === 'number' || typeof lim.max === 'number') return lim;
+
+      const nLabel = normalize(datasetLabel);
+      for (const key of Object.keys(lim)) {
+        const nk = normalize(key);
+        if (nk === nLabel || nk.includes(nLabel) || nLabel.includes(nk)) {
+          return lim[key];
+        }
+      }
+      return lim[Object.keys(lim)[0]];
+    }
+
+    function renderChart(id, chartData, tankName) {
+      const canvas = document.getElementById(id);
+      if (!canvas) return;
+
+      const labels = Array.isArray(chartData?.labels) ? chartData.labels : [];
+      const dsArr  = Array.isArray(chartData?.datasets) ? chartData.datasets : [];
+      if (dsArr.length === 0) return;
+
+      let ann = {};
+      const firstLabel = dsArr[0]?.label ?? '';
+      const limits = getLimitsFor(tankName, firstLabel);
       if (limits && (typeof limits.min === 'number') && (typeof limits.max === 'number')) {
         ann.idealBox = {
           type: 'box',
@@ -667,11 +1303,14 @@
     // Timers
     setInterval(updateClock, 1000);
     setInterval(nextSlide, 20000);
-    setInterval(fetchData, 60000); // se quiser, use 61000 para “desalinha-lo” dos 20s
+    setInterval(fetchData, 60000); // se quiser, use 61000 para “desalinhá-lo” dos 20s
 
-    // Boot
-    updateClock();
-    fetchData();
+    // Boot: 1) busca cores, 2) relógio, 3) dados
+    (async () => {
+      await fetchColors();
+      updateClock();
+      fetchData();
+    })();
   </script>
 </body>
 </html>
