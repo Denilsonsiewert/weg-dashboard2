@@ -3,11 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>WEG - Controle Analítico Estanhagem</title>
-
-    <!-- Chart.js + Plugin de Anotação -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
-
     <style>
         :root {
             --weg-blue: #00579d;
@@ -19,7 +15,7 @@
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
-
+        
         body {
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background-color: #f4f7f9;
@@ -32,159 +28,327 @@
 
         .header {
             background: var(--white);
-            padding: 15px 40px;
+            padding: 10px 40px;
             display: grid;
             grid-template-columns: 200px 1fr 200px;
             align-items: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 15px rgba(0,0,0,0.08);
             border-bottom: 4px solid var(--weg-blue);
             z-index: 100;
         }
 
-        .logo-weg { height: 50px; }
-
-        /* 🔹 ALTERAÇÃO APENAS AQUI */
+        .logo-weg { height: 45px; object-fit: contain; }
+        
         .header-title {
-            font-size: 1.8em;
-            font-weight: 700;
+            font-size: 2em;
+            font-weight: 800;
             color: var(--weg-blue);
             text-transform: uppercase;
-            letter-spacing: 1px;
-            text-align: left; /* antes era center */
+            letter-spacing: 2px;
+            text-align: center;
         }
 
-        .header-right { text-align: right; }
-        #clock { font-size: 1.4em; font-weight: 600; color: var(--weg-blue); }
-        #date { font-size: 0.9em; color: var(--weg-gray); }
+        .header-right { text-align: right; line-height: 1.2; }
+        #clock { font-size: 1.4em; font-weight: 700; color: var(--weg-blue); }
+        #date { font-size: 0.85em; color: var(--weg-gray); font-weight: 600; }
 
         .slide-container {
             flex: 1;
             position: relative;
-            padding: 30px;
-            background: linear-gradient(180deg, #f4f7f9 0%, #e9eff5 100%);
+            padding: 25px;
+            background: linear-gradient(135deg, #f4f7f9 0%, #e9eff5 100%);
         }
 
         .slide {
             position: absolute;
-            top: 30px; left: 30px; right: 30px; bottom: 30px;
+            top: 25px; left: 25px; right: 25px; bottom: 25px;
             display: none;
             grid-template-columns: 1fr 1fr;
-            gap: 30px;
-            animation: slideIn 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+            gap: 25px;
+            animation: slideFade 0.8s cubic-bezier(0.23, 1, 0.32, 1);
         }
 
         .slide.active { display: grid; }
-        .slide.full-slide { grid-template-columns: 1fr; }
+        .slide.full-slide { grid-template-columns: 1fr; max-width: 1200px; margin: 0 auto; }
 
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+        @keyframes slideFade {
+            from { opacity: 0; transform: scale(0.98); }
+            to { opacity: 1; transform: scale(1); }
         }
 
         .card {
             background: var(--white);
-            border-radius: 12px;
-            padding: 25px;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.04);
             display: flex;
             flex-direction: column;
-            border: 1px solid rgba(0,87,157,0.1);
+            border: 1px solid rgba(0,87,157,0.08);
+            overflow: hidden;
         }
 
         .card-title {
             color: var(--weg-blue);
-            font-size: 1.6em;
-            font-weight: 700;
-            margin-bottom: 20px;
+            font-size: 1.5em;
+            font-weight: 800;
+            margin-bottom: 15px;
             padding-bottom: 10px;
-            border-bottom: 2px solid var(--weg-light-blue);
+            border-bottom: 3px solid var(--weg-light-blue);
             text-align: center;
+            text-transform: uppercase;
         }
 
-        .chart-wrapper { flex: 1; min-height: 0; margin-bottom: 20px; }
+        .chart-wrapper { 
+            flex: 1; 
+            min-height: 0; 
+            margin-bottom: 15px;
+            position: relative;
+        }
+
+        .table-container {
+            background: #fcfdfe;
+            border-radius: 8px;
+            padding: 5px;
+            border: 1px solid #edf2f7;
+        }
 
         table {
             width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-            font-size: 1.2em;
+            border-collapse: collapse;
+            font-size: 1.1em;
         }
 
         th {
             background-color: var(--weg-light-blue);
             color: var(--weg-blue);
-            padding: 15px;
-            text-align: left;
-            font-weight: 600;
+            padding: 10px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 0.9em;
             border-bottom: 2px solid var(--weg-blue);
         }
 
         td {
-            padding: 15px;
-            border-bottom: 1px solid #eee;
-            color: #333;
+            padding: 10px;
+            border-bottom: 1px solid #f0f0f0;
+            color: #2d3748;
             text-align: center;
         }
 
-        tr:nth-child(even) { background-color: #fafafa; }
+        tr:last-child td { border-bottom: none; }
+        tr:nth-child(even) { background-color: #f8fafc; }
 
         .status-badge {
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-weight: 700;
-            font-size: 0.9em;
+            padding: 8px 20px;
+            border-radius: 30px;
+            font-weight: 800;
+            font-size: 0.95em;
             text-transform: uppercase;
             display: inline-block;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
 
-        .status-atrasado { background-color: #ffebee; color: var(--danger); border: 1px solid var(--danger); }
-        .status-ok { background-color: #e8f5e9; color: var(--success); border: 1px solid var(--success); }
+        .status-atrasado { background-color: #fff5f5; color: var(--danger); border: 2px solid var(--danger); }
+        .status-ok { background-color: #f0fff4; color: var(--success); border: 2px solid var(--success); }
 
         .footer {
             background: var(--white);
-            padding: 10px 40px;
+            padding: 8px 40px;
             display: flex;
             justify-content: space-between;
+            align-items: center;
             font-size: 0.9em;
             color: var(--weg-gray);
-            border-top: 1px solid #ddd;
+            border-top: 1px solid #e2e8f0;
+            font-weight: 600;
         }
 
-        .sync-indicator { display: flex; align-items: center; gap: 8px; }
-        .dot { width: 10px; height: 10px; background: var(--success); border-radius: 50%; animation: pulse 2s infinite; }
-
+        .sync-indicator { display: flex; align-items: center; gap: 10px; }
+        .dot { width: 12px; height: 12px; background: var(--success); border-radius: 50%; position: relative; }
+        .dot::after {
+            content: '';
+            position: absolute;
+            width: 100%; height: 100%;
+            background: inherit;
+            border-radius: inherit;
+            animation: pulse 2s infinite;
+        }
+        
         @keyframes pulse {
-            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
-            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+            0% { transform: scale(1); opacity: 0.8; }
+            100% { transform: scale(2.5); opacity: 0; }
         }
     </style>
 </head>
 <body>
+    <header class="header">
+        <img src="weg_logo.png" alt="WEG Logo" class="logo-weg" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Weg_logo.svg/1200px-Weg_logo.svg.png'">
+        <div class="header-title">Controle Analítico Estanhagem</div>
+        <div class="header-right">
+            <div id="clock">00:00:00</div>
+            <div id="date">--/--/----</div>
+        </div>
+    </header>
 
-<header class="header">
-    <img src="weg_logo.png" alt="WEG Logo" class="logo-weg"
-         onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Weg_logo.svg/1200px-Weg_logo.svg.png'">
-    <div class="header-title">Controle Analítico Estanhagem</div>
-    <div class="header-right">
-        <div id="clock">00:00:00</div>
-        <div id="date">--/--/----</div>
-    </div>
-</header>
+    <main class="slide-container" id="slides"></main>
 
-<main class="slide-container" id="slides"></main>
+    <footer class="footer">
+        <div class="sync-indicator">
+            <div class="dot"></div>
+            <span id="lastUpdate">Sincronizando dados...</span>
+        </div>
+        <div style="color: var(--weg-blue)">WEG Industrial - Monitoramento de Processos</div>
+    </footer>
 
-<footer class="footer">
-    <div class="sync-indicator">
-        <div class="dot"></div>
-        <span id="lastUpdate">Sincronizando dados...</span>
-    </div>
-    <div>Monitoramento em Tempo Real - WEG Industrial</div>
-</footer>
+    <script>
+        let currentSlideIndex = 0;
+        let dataCache = null;
+        const wegColors = ['#00579d', '#00a1e4', '#58595b', '#808285'];
 
-<script>
-/* 🔹 SCRIPT MANTIDO 100% ORIGINAL (sem alterações) */
-</script>
+        async function fetchData() {
+            try {
+                const res = await fetch('dados.json?' + Date.now());
+                dataCache = await res.json();
+                document.getElementById('lastUpdate').textContent = `Dados Atualizados: ${new Date(dataCache.timestamp).toLocaleString('pt-BR')}`;
+                setupSlides();
+            } catch (e) { console.error("Erro ao buscar dados", e); }
+        }
 
+        function setupSlides() {
+            const container = document.getElementById('slides');
+            container.innerHTML = '';
+            const slidesData = [];
+            
+            const capa = dataCache.analises.find(a => a.tipo === "capa");
+            const analises = dataCache.analises.filter(a => a.tipo === "analise");
+
+            if (capa) slidesData.push({tipo: 'capa', dados: capa});
+            for (let i = 0; i < analises.length; i += 2) {
+                slidesData.push({tipo: 'analise', dados: analises.slice(i, i + 2)});
+            }
+
+            slidesData.forEach((slideObj, sIndex) => {
+                const slide = document.createElement('div');
+                slide.className = `slide ${sIndex === 0 ? 'active' : ''}`;
+                
+                if (slideObj.tipo === 'capa') {
+                    slide.classList.add('full-slide');
+                    let rows = slideObj.dados.status_data.map(s => `
+                        <tr>
+                            <td style="font-weight: 800; color: var(--weg-blue); text-align: left; padding-left: 30px;">${s.tanque}</td>
+                            <td style="font-weight: 700;">${s.proxima}</td>
+                            <td><span class="status-badge ${s.status.includes('ATRASADO') ? 'status-atrasado' : 'status-ok'}">${s.status}</span></td>
+                        </tr>`).join('');
+                    slide.innerHTML = `
+                        <div class="card">
+                            <div class="card-title">Resumo de Status das Análises</div>
+                            <div style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px;">
+                                <table style="max-width: 1000px;">
+                                    <thead>
+                                        <tr>
+                                            <th style="text-align: left; padding-left: 30px;">EQUIPAMENTO / TANQUE</th>
+                                            <th>PRÓXIMA ANÁLISE</th>
+                                            <th>STATUS ATUAL</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>${rows}</tbody>
+                                </table>
+                            </div>
+                        </div>`;
+                } else {
+                    slideObj.dados.forEach((ana, aIndex) => {
+                        const card = document.createElement('div');
+                        card.className = 'card';
+                        const canvasId = `chart-${sIndex}-${aIndex}`;
+                        const headers = ana.chart_data.datasets.map(ds => `<th>${ds.label.split(' ')[0]}</th>`).join('');
+                        let rows = ana.ultimas_analises.map(r => {
+                            let vals = '';
+                            for(let k=1; k<=ana.chart_data.datasets.length; k++) vals += `<td style="font-weight: 700;">${r['Val'+k]}</td>`;
+                            return `<tr><td style="font-weight: 700; color: var(--weg-blue);">${r.Data}</td>${vals}</tr>`;
+                        }).join('');
+                        
+                        card.innerHTML = `
+                            <div class="card-title">${ana.nome}</div>
+                            <div class="chart-wrapper"><canvas id="${canvasId}"></canvas></div>
+                            <div class="table-container">
+                                <table>
+                                    <thead><tr><th>DATA</th>${headers}</tr></thead>
+                                    <tbody>${rows}</tbody>
+                                </table>
+                            </div>`;
+                        setTimeout(() => renderChart(canvasId, ana.chart_data), 100);
+                        slide.appendChild(card);
+                    });
+                }
+                container.appendChild(slide);
+            });
+            currentSlideIndex = 0;
+        }
+
+        function renderChart(id, chartData) {
+            const ctx = document.getElementById(id).getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartData.labels,
+                    datasets: chartData.datasets.map((ds, i) => ({
+                        label: ds.label,
+                        data: ds.data,
+                        borderColor: wegColors[i % wegColors.length],
+                        backgroundColor: i === 0 ? 'rgba(0, 87, 157, 0.08)' : 'transparent',
+                        borderWidth: 5,
+                        pointRadius: 7,
+                        pointHoverRadius: 10,
+                        pointBackgroundColor: '#fff',
+                        pointBorderWidth: 3,
+                        tension: 0.35,
+                        fill: i === 0
+                    }))
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { 
+                            position: 'top', 
+                            align: 'end',
+                            labels: { usePointStyle: true, font: { size: 13, weight: '800' }, padding: 20 } 
+                        }
+                    },
+                    scales: {
+                        y: { 
+                            grid: { color: '#f0f0f0', drawBorder: false }, 
+                            ticks: { color: var(--weg-gray), font: { weight: '700', size: 12 } } 
+                        },
+                        x: { 
+                            grid: { display: false }, 
+                            ticks: { color: var(--weg-gray), font: { weight: '700', size: 12 } } 
+                        }
+                    }
+                }
+            });
+        }
+
+        function nextSlide() {
+            const slides = document.querySelectorAll('.slide');
+            if (slides.length <= 1) return;
+            slides[currentSlideIndex].classList.remove('active');
+            currentSlideIndex = (currentSlideIndex + 1) % slides.length;
+            slides[currentSlideIndex].classList.add('active');
+        }
+
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').textContent = now.toLocaleTimeString('pt-BR');
+            document.getElementById('date').textContent = now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+        }
+
+        setInterval(updateClock, 1000);
+        setInterval(nextSlide, 20000); // Transição de 20 segundos
+        setInterval(fetchData, 60000);
+        
+        updateClock();
+        fetchData();
+    </script>
 </body>
 </html>
