@@ -1,503 +1,179 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <title>WEG - Controle Analítico Estanhagem</title>
-
-   
-    <style>
-        :root {
-            --weg-blue: #00579d;
-            --weg-light-blue: #e6f0f9;
-            --weg-gray: #58595b;
-            --success: #28a745;
-            --danger: #dc3545;
-            --white: #ffffff;
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        body {
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f4f7f9;
-            color: var(--weg-gray);
-            overflow: hidden;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .header {
-            background: var(--white);
-            padding: 15px 40px;
-            display: grid;
-            grid-template-columns: 200px 1fr 200px;
-            align-items: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            border-bottom: 4px solid var(--weg-blue);
-            z-index: 100;
-        }
-
-        .logo-weg { height: 50px; }
-        .header-title {
-            font-size: 1.8em;
-            font-weight: 700;
-            color: var(--weg-blue);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            text-align: center;
-        }
-
-        .header-right { text-align: right; }
-        #clock { font-size: 1.4em; font-weight: 600; color: var(--weg-blue); }
-        #date { font-size: 0.9em; color: var(--weg-gray); }
-
-        .slide-container {
-            flex: 1;
-            position: relative;
-            padding: 30px;
-            background: linear-gradient(180deg, #f4f7f9 0%, #e9eff5 100%);
-        }
-
-        .slide {
-            position: absolute;
-            top: 30px; left: 30px; right: 30px; bottom: 30px;
-            display: none;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-            animation: slideIn 0.6s cubic-bezier(0.23, 1, 0.32, 1);
-        }
-
-        .slide.active { display: grid; }
-        .slide.full-slide { grid-template-columns: 1fr; }
-
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .card {
-            background: var(--white);
-            border-radius: 12px;
-            padding: 25px;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.05);
-            display: flex;
-            flex-direction: column;
-            border: 1px solid rgba(0,87,157,0.1);
-        }
-
-        .card-title {
-            color: var(--weg-blue);
-            font-size: 1.6em;
-            font-weight: 700;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid var(--weg-light-blue);
-            text-align: center;
-        }
-
-        .chart-wrapper { flex: 1; min-height: 0; margin-bottom: 20px; }
-
-        table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-            font-size: 1.2em;
-        }
-
-        th {
-            background-color: var(--weg-light-blue);
-            color: var(--weg-blue);
-            padding: 15px;
-            text-align: left;
-            font-weight: 600;
-            border-bottom: 2px solid var(--weg-blue);
-        }
-
-        td {
-            padding: 15px;
-            border-bottom: 1px solid #eee;
-            color: #333;
-            text-align: center;
-        }
-
-        tr:nth-child(even) { background-color: #fafafa; }
-
-        .status-badge {
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-weight: 700;
-            font-size: 0.9em;
-            text-transform: uppercase;
-            display: inline-block;
-        }
-
-        .status-atrasado { background-color: #ffebee; color: var(--danger); border: 1px solid var(--danger); }
-        .status-ok { background-color: #e8f5e9; color: var(--success); border: 1px solid var(--success); }
-
-        .footer {
-            background: var(--white);
-            padding: 10px 40px;
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.9em;
-            color: var(--weg-gray);
-            border-top: 1px solid #ddd;
-        }
-
-        .sync-indicator { display: flex; align-items: center; gap: 8px; }
-        .dot { width: 10px; height: 10px; background: var(--success); border-radius: 50%; animation: pulse 2s infinite; }
-
-        @keyframes pulse {
-            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
-            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
-        }
-    </style>
-</head>
-<body>
-    <header class="header">
-        <img src="weg_logo.png" alt="WEG Logo" class="logo-weg"
-             onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Weg_logo.svg/1200px-Weg_logo.svg.png'">
-        <div class="header-title">Controle Analítico Estanhagem</div>
-        <div class="header-right">
-            <div id="clock">00:00:00</div>
-            <div id="date">--/--/----</div>
-        </div>
-    </header>
-
-    <main class="slide-container" id="slides"></main>
-
-    <footer class="footer">
-        <div class="sync-indicator">
-            <div class="dot"></div>
-            <span id="lastUpdate">Sincronizando dados...</span>
-        </div>
-        <div>Monitoramento em Tempo Real - WEG Industrial</div>
-    </footer>
-
-    <script>
-        // --- Registro do plugin de anotação (necessário em Chart.js v4) ---
-        try {
-            if (window.Chart && (window['chartjs-plugin-annotation'] || window.ChartAnnotation)) {
-                Chart.register(window['chartjs-plugin-annotation'] || window.ChartAnnotation);
-            }
-        } catch (e) {
-            console.warn('Falha ao registrar plugin de anotação:', e);
-        }
-
-        let currentSlideIndex = 0;
-        let dataCache = null;
-        const wegColors = ['#00579d', '#00a1e4', '#58595b', '#808285'];
-        const chartsRegistry = new Map(); // id -> Chart instance
-
-        // Limites de controle (mantidos)
-        const controlLimits = {
-            "Desengraxante": { min: 30, max: 40 },
-            "Ativação - Tanque 5": { min: 0.5, max: 1.5 },
-            "Ativação - Tanque 6": { min: 30, max: 40 },
-            "Níquel WATT": {
-                "Niº (g/L)": { min: 60, max: 80 },
-                "NiCl2 (mL/L)": { min: 50, max: 70 },
-                "H3BO3 (g/L)": { min: 35, max: 45 }
-            },
-            "Estanhagem A": {
-                "Sn (g/L)": { min: 20, max: 30 },
-                "H2SO4 (mL/L)": { min: 50, max: 70 }
-            },
-            "Estanhagem B": {
-                "Sn (g/L)": { min: 20, max: 30 },
-                "H2SO4 (mL/L)": { min: 50, max: 70 }
-            }
-        };
-
-        // --- Helpers robustos ---
-        const normalize = (s) => (s ?? '')
-            .toString()
-            .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
-            .replace(/[º°]/g, '') // remove símbolos grau/ordinal
-            .replace(/\s+/g, ' ') // espaços múltiplos -> 1
-            .trim()
-            .toLowerCase();
-
-        function getLimitsFor(tankName, datasetLabel) {
-            const lim = controlLimits?.[tankName];
-            if (!lim) return null;
-
-            // Caso simples (um único range min/max)
-            if (typeof lim.min === 'number' || typeof lim.max === 'number') {
-                return lim;
-            }
-
-            // Caso multi-parâmetro: busca flexível por chave
-            const nLabel = normalize(datasetLabel);
-            let found = null;
-
-            for (const key of Object.keys(lim)) {
-                const nKey = normalize(key);
-                if (nKey === nLabel || nKey.includes(nLabel) || nLabel.includes(nKey)) {
-                    found = lim[key];
-                    break;
-                }
-            }
-
-            // Fallback: primeiro parâmetro se não achou correspondência
-            return found ?? lim[Object.keys(lim)[0]];
-        }
-
-        function toNumber(v) {
-            if (typeof v === 'number') return v;
-            if (v == null) return null;
-            const s = String(v).replace(',', '.').trim();
-            const n = Number(s);
-            return Number.isFinite(n) ? n : null;
-        }
-
-        async function fetchData() {
-            try {
-                const base = (window.location && window.location.origin && window.location.origin !== 'null')
-                    ? window.location.origin
-                    : '';
-                const API_URL = base + '/api/dados';
-
-                const res = await fetch(API_URL, { cache: 'no-store' });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-                dataCache = await res.json();
-
-                const ts = dataCache?.timestamp ? new Date(dataCache.timestamp) : new Date();
-                document.getElementById('lastUpdate').textContent =
-                    `Última Atualização: ${ts.toLocaleString('pt-BR')}`;
-
-                setupSlides();
-            } catch (e) {
-                console.error("Erro ao buscar dados", e);
-                document.getElementById('lastUpdate').textContent = 'Erro ao carregar dados. Aguardando Excel...';
-            }
-        }
-
-        function destroyAllCharts() {
-            for (const [, chart] of chartsRegistry) {
-                try { chart.destroy(); } catch {}
-            }
-            chartsRegistry.clear();
-        }
-
-        function setupSlides() {
-            const container = document.getElementById('slides');
-            container.innerHTML = '';
-
-            // Destroi charts prévios para evitar vazamento
-            destroyAllCharts();
-
-            const analisesAll = Array.isArray(dataCache?.analises) ? dataCache.analises : [];
-            const capa = analisesAll.find(a => a?.tipo === 'capa');
-            const analises = analisesAll.filter(a => a?.tipo === 'analise');
-
-            const slidesData = [];
-            if (capa) slidesData.push({ tipo: 'capa', dados: capa });
-            for (let i = 0; i < analises.length; i += 2) {
-                slidesData.push({ tipo: 'analise', dados: analises.slice(i, i + 2) });
-            }
-
-            if (slidesData.length === 0) {
-                const noSlide = document.createElement('div');
-                noSlide.className = 'slide active full-slide';
-                noSlide.innerHTML = `
-                    <div class="card">
-                        <div class="card-title">Sem dados disponíveis</div>
-                        <div style="flex:1;display:flex;align-items:center;justify-content:center;color:#666;">
-                            Aguarde a sincronização com o Excel/API.
-                        </div>
-                    </div>`;
-                container.appendChild(noSlide);
-                currentSlideIndex = 0;
-                return;
-            }
-
-            slidesData.forEach((slideObj, sIndex) => {
-                const slide = document.createElement('div');
-                slide.className = `slide ${sIndex === 0 ? 'active' : ''}`;
-
-                if (slideObj.tipo === 'capa') {
-                    slide.classList.add('full-slide');
-                    const statusData = Array.isArray(slideObj.dados?.status_data) ? slideObj.dados.status_data : [];
-                    const rows = statusData.map(s => `
-                        <tr>
-                            <td style="font-weight:700;color:var(--weg-blue);text-align:left;">${s?.tanque ?? '-'}</td>
-                            <td style="text-align:center;font-weight:600;">${s?.proxima ?? '-'}</td>
-                            <td style="text-align:center;">
-                                <span class="status-badge ${(s?.status || '').includes('ATRASADO') ? 'status-atrasado' : 'status-ok'}">
-                                    ${s?.status ?? '—'}
-                                </span>
-                            </td>
-                        </tr>`).join('');
-
-                    slide.innerHTML = `
-                        <div class="card">
-                            <div class="card-title">Resumo de Status das Análises</div>
-                            <div style="flex:1;display:flex;align-items:center;">
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th style="text-align:left;">EQUIPAMENTO / TANQUE</th>
-                                            <th style="text-align:center;">PRÓXIMA ANÁLISE</th>
-                                            <th style="text-align:center;">STATUS ATUAL</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>${rows}</tbody>
-                                </table>
-                            </div>
-                        </div>`;
-                } else {
-                    const cards = Array.isArray(slideObj.dados) ? slideObj.dados : [];
-                    cards.forEach((ana, aIndex) => {
-                        const card = document.createElement('div');
-                        card.className = 'card';
-                        const canvasId = `chart-${sIndex}-${aIndex}`;
-
-                        const dsArr = Array.isArray(ana?.chart_data?.datasets) ? ana.chart_data.datasets : [];
-                        const headers = dsArr.map(ds => {
-                            const label = (ds?.label ?? '').toString();
-                            const short = label.split(' ')[0] || label;
-                            return `<th style="text-align:center;">${short}</th>`;
-                        }).join('');
-
-                        const ult = Array.isArray(ana?.ultimas_analises) ? ana.ultimas_analises : [];
-                        const rows = ult.map(r => {
-                            let vals = '';
-                            for (let k = 1; k <= dsArr.length; k++) {
-                                const val = r?.[`Val${k}`];
-                                vals += `<td style="text-align:center;font-weight:600;">${val ?? '—'}</td>`;
-                            }
-                            return `<tr><td style="font-weight:600;">${r?.Data ?? '-'}</td>${vals}</tr>`;
-                        }).join('');
-
-                        card.innerHTML = `
-                            <div class="card-title">${ana?.nome ?? '—'}</div>
-                            <div class="chart-wrapper"><canvas id="${canvasId}"></canvas></div>
-                            <table>
-                                <thead><tr><th>DATA</th>${headers}</tr></thead>
-                                <tbody>${rows}</tbody>
-                            </table>`;
-
-                        // Garante que o canvas exista antes de renderizar
-                        requestAnimationFrame(() => renderChart(canvasId, ana?.chart_data, ana?.nome));
-
-                        slide.appendChild(card);
-                    });
-                }
-
-                container.appendChild(slide);
-            });
-
-            currentSlideIndex = 0;
-        }
-
-        function renderChart(id, chartData, tankName) {
-            const canvas = document.getElementById(id);
-            if (!canvas) return;
-
-            const labels = Array.isArray(chartData?.labels) ? chartData.labels : [];
-            const dsArr = Array.isArray(chartData?.datasets) ? chartData.datasets : [];
-            if (dsArr.length === 0) {
-                // Sem datasets, não renderiza
-                return;
-            }
-
-            // Prepara anotações (faixa ideal)
-            // - Para tanques simples: usa min/max direto
-            // - Para multi-parâmetro: tenta casar com o label do 1º dataset; se não achar, usa o 1º disponível
-            let ann = {};
-            const firstLabel = dsArr[0]?.label ?? '';
-            const limits = getLimitsFor(tankName, firstLabel);
-
-            if (limits && (typeof limits.min === 'number') && (typeof limits.max === 'number')) {
-                ann.idealBox = {
-                    type: 'box',
-                    yMin: limits.min,
-                    yMax: limits.max,
-                    backgroundColor: 'rgba(40, 167, 69, 0.15)',
-                    borderColor: 'rgba(40, 167, 69, 0.3)',
-                    borderWidth: 1
-                };
-            }
-
-            const cfg = {
-                type: 'line',
-                data: {
-                    labels,
-                    datasets: dsArr.map((ds, i) => {
-                        const color = wegColors[i % wegColors.length];
-                        const dataPoints = Array.isArray(ds?.data) ? ds.data.map(toNumber) : [];
-                        return {
-                            label: ds?.label ?? `Série ${i + 1}`,
-                            data: dataPoints,
-                            borderColor: color,
-                            backgroundColor: i === 0 ? 'rgba(0, 87, 157, 0.05)' : 'transparent',
-                            borderWidth: 4,
-                            pointRadius: 6,
-                            pointBackgroundColor: color,
-                            tension: 0.3,
-                            fill: i === 0
-                        };
-                    })
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                            labels: { usePointStyle: true, font: { size: 12, weight: 'bold' } }
-                        },
-                        annotation: { annotations: ann }
-                    },
-                    scales: {
-                        y: {
-                            grid: { color: '#eee' },
-                            ticks: { color: '#666', font: { weight: 'bold' } }
-                        },
-                        x: {
-                            grid: { display: false },
-                            ticks: { color: '#666', font: { weight: 'bold' } }
-                        }
-                    }
-                }
-            };
-
-            try {
-                const chart = new Chart(canvas.getContext('2d'), cfg);
-                chartsRegistry.set(id, chart);
-            } catch (e) {
-                console.error('Erro ao renderizar gráfico', e);
-            }
-        }
-
-        function nextSlide() {
-            const slides = document.querySelectorAll('.slide');
-            if (slides.length <= 1) return;
-            slides[currentSlideIndex].classList.remove('active');
-            currentSlideIndex = (currentSlideIndex + 1) % slides.length;
-            slides[currentSlideIndex].classList.add('active');
-        }
-
-        function updateClock() {
-            const now = new Date();
-            document.getElementById('clock').textContent = now.toLocaleTimeString('pt-BR');
-            document.getElementById('date').textContent = now.toLocaleDateString('pt-BR', {
-                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-            });
-        }
-
-        // Timers
-        setInterval(updateClock, 1000);
-        setInterval(nextSlide, 20000);
-        setInterval(fetchData, 60000);
-
-        // Boot
-        updateClock();
-        fetchData();
-    </script>
-</body>
-</html>
+<style>
+    :root {
+        --weg-blue: #00579d;
+        --weg-light-blue: #e6f0f9;
+        --weg-gray: #58595b;
+        --success: #28a745;
+        --danger: #dc3545;
+        --white: #ffffff;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        background: linear-gradient(180deg, #f4f7f9 0%, #e9eff5 100%);
+        color: var(--weg-gray);
+        min-height: 100vh;
+        overflow-x: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* HEADER */
+    .header {
+        background: var(--white);
+        padding: 15px 35px;
+        display: grid;
+        grid-template-columns: 180px 1fr 180px;
+        align-items: center;
+        box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+        border-bottom: 4px solid var(--weg-blue);
+    }
+
+    .logo-weg { height: 45px; }
+
+    .header-title {
+        font-size: 1.6em;
+        font-weight: 700;
+        color: var(--weg-blue);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        text-align: center;
+    }
+
+    #clock {
+        font-size: 1.2em;
+        font-weight: 600;
+        color: var(--weg-blue);
+    }
+
+    #date {
+        font-size: 0.85em;
+    }
+
+    /* CONTAINER */
+    .slide-container {
+        flex: 1;
+        position: relative;
+        padding: 25px;
+    }
+
+    .slide {
+        position: relative;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 25px;
+    }
+
+    .slide.full-slide {
+        grid-template-columns: 1fr;
+    }
+
+    /* CARDS */
+    .card {
+        background: var(--white);
+        border-radius: 12px;
+        padding: 22px;
+        box-shadow: 0 8px 18px rgba(0,0,0,0.05);
+        display: flex;
+        flex-direction: column;
+        border: 1px solid rgba(0,87,157,0.08);
+    }
+
+    .card-title {
+        color: var(--weg-blue);
+        font-size: 1.4em;
+        font-weight: 700;
+        margin-bottom: 18px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid var(--weg-light-blue);
+        text-align: center;
+    }
+
+    .chart-wrapper {
+        height: 320px;
+        margin-bottom: 20px;
+    }
+
+    /* TABELAS */
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.95em;
+    }
+
+    th {
+        background: var(--weg-light-blue);
+        color: var(--weg-blue);
+        padding: 12px;
+        font-weight: 600;
+        text-align: center;
+        border-bottom: 2px solid var(--weg-blue);
+    }
+
+    th:first-child { text-align: left; }
+
+    td {
+        padding: 10px;
+        border-bottom: 1px solid #eee;
+        text-align: center;
+    }
+
+    td:first-child {
+        text-align: left;
+        font-weight: 600;
+    }
+
+    tr:nth-child(even) {
+        background-color: #fafafa;
+    }
+
+    tr:hover {
+        background-color: #f1f7fc;
+    }
+
+    /* STATUS */
+    .status-badge {
+        padding: 5px 14px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.75em;
+        text-transform: uppercase;
+    }
+
+    .status-atrasado {
+        background-color: #ffebee;
+        color: var(--danger);
+        border: 1px solid var(--danger);
+    }
+
+    .status-ok {
+        background-color: #e8f5e9;
+        color: var(--success);
+        border: 1px solid var(--success);
+    }
+
+    /* FOOTER */
+    .footer {
+        background: var(--white);
+        padding: 10px 35px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.85em;
+        border-top: 1px solid #ddd;
+    }
+
+    .sync-indicator {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .dot {
+        width: 8px;
+        height: 8px;
+        background: var(--success);
+        border-radius: 50%;
+    }
+</style>
