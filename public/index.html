@@ -1,677 +1,611 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <title>WEG - Controle Analítico Estanhagem</title>
+    <meta charset="UTF-8">
+    <title>WEG - Controle Analítico Estanhagem</title>
 
-  <!-- Chart.js + Plugin de Anotação -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <!-- Chart.js + Plugin de Anotação -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
 
-  <style>
-    :root {
-      --weg-blue: #00579d;
-      --weg-light-blue: #e6f0f9;
-      --weg-gray: #58595b;
-      --success: #28a745;
-      --danger: #dc3545;
-      --white: #ffffff;
-    }
+    <style>
+        :root {
+            --weg-blue: #00579d;
+            --weg-light-blue: #e6f0f9;
+            --weg-gray: #58595b;
+            --success: #28a745;
+            --danger: #dc3545;
+            --white: #ffffff;
+        }
 
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
-    body {
-      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      background-color: #f4f7f9;
-      color: var(--weg-gray);
-      overflow: hidden;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f7f9;
+            color: var(--weg-gray);
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
 
-    .header {
-      background: var(--white);
-      padding: 15px 40px;
-      display: grid;
-      grid-template-columns: 200px 1fr 200px;
-      align-items: center;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-      border-bottom: 4px solid var(--weg-blue);
-      z-index: 100;
-    }
+        .header {
+            background: var(--white);
+            padding: 15px 40px;
+            display: grid;
+            grid-template-columns: 200px 1fr 200px;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-bottom: 4px solid var(--weg-blue);
+            z-index: 100;
+        }
 
-    .logo-weg { height: 50px; }
-    .header-title {
-      font-size: 1.8em;
-      font-weight: 700;
-      color: var(--weg-blue);
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      text-align: center;
-    }
+        .logo-weg { height: 50px; }
+        .header-title {
+            font-size: 1.8em;
+            font-weight: 700;
+            color: var(--weg-blue);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-align: center;
+        }
 
-    .header-right { text-align: right; }
-    #clock { font-size: 1.4em; font-weight: 600; color: var(--weg-blue); }
-    #date  { font-size: 0.9em; color: var(--weg-gray); }
+        .header-right { text-align: right; }
+        #clock { font-size: 1.4em; font-weight: 600; color: var(--weg-blue); }
+        #date { font-size: 0.9em; color: var(--weg-gray); }
 
-    .slide-container {
-      flex: 1;
-      position: relative;
-      padding: 30px;
-      background: linear-gradient(180deg, #f4f7f9 0%, #e9eff5 100%);
-    }
+        .slide-container {
+            flex: 1;
+            position: relative;
+            padding: 30px;
+            background: linear-gradient(180deg, #f4f7f9 0%, #e9eff5 100%);
+        }
 
-    .slide {
-      position: absolute;
-      top: 30px; left: 30px; right: 30px; bottom: 30px;
-      display: none;
-      grid-template-columns: 1fr 1fr;
-      gap: 30px;
-      animation: slideIn 0.6s cubic-bezier(0.23, 1, 0.32, 1);
-    }
+        .slide {
+            position: absolute;
+            top: 30px; left: 30px; right: 30px; bottom: 30px;
+            display: none;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            animation: slideIn 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+        }
 
-    .slide.active { display: grid; }
-    .slide.full-slide { grid-template-columns: 1fr; }
+        .slide.active { display: grid; }
+        .slide.full-slide { grid-template-columns: 1fr; }
 
-    @keyframes slideIn {
-      from { opacity: 0; transform: translateY(20px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
 
-    .card {
-      background: var(--white);
-      border-radius: 12px;
-      padding: 25px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.05);
-      display: flex;
-      flex-direction: column;
-      border: 1px solid rgba(0,87,157,0.1);
-    }
+        .card {
+            background: var(--white);
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(0,87,157,0.1);
+        }
 
-    .card-title {
-      color: var(--weg-blue);
-      font-size: 1.6em;
-      font-weight: 700;
-      margin-bottom: 20px;
-      padding-bottom: 10px;
-      border-bottom: 2px solid var(--weg-light-blue);
-      text-align: center;
-    }
+        .card-title {
+            color: var(--weg-blue);
+            font-size: 1.6em;
+            font-weight: 700;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--weg-light-blue);
+            text-align: center;
+        }
 
-    .chart-wrapper { flex: 1; min-height: 0; margin-bottom: 20px; }
+        .chart-wrapper { flex: 1; min-height: 0; margin-bottom: 20px; }
 
-    /* --- Tabelas: alinhamento sólido de títulos e dados --- */
-    table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 1.2em; table-layout: fixed; }
-    th    { background-color: var(--weg-light-blue); color: var(--weg-blue); padding: 15px; text-align: center; font-weight: 600; border-bottom: 2px solid var(--weg-blue); }
-    td    { padding: 15px; border-bottom: 1px solid #eee; color: #333; text-align: center; }
-    tr:nth-child(even) { background-color: #fafafa; }
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 1.2em;
+        }
 
-    th .th-main { font-weight: 700; line-height: 1.1; }
-    th .th-sub  { margin-top: 2px; font-size: 0.75em; color: #808285; font-weight: 600; line-height: 1; }
-    .numeric    { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+        th {
+            background-color: var(--weg-light-blue);
+            color: var(--weg-blue);
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid var(--weg-blue);
+        }
 
-    .status-badge {
-      padding: 8px 16px;
-      border-radius: 20px;
-      font-weight: 700;
-      font-size: 0.9em;
-      text-transform: uppercase;
-      display: inline-block;
-    }
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            color: #333;
+            text-align: center;
+        }
 
-    .status-atrasado { background-color: #ffebee; color: var(--danger);  border: 1px solid var(--danger); }
-    .status-ok       { background-color: #e8f5e9; color: var(--success); border: 1px solid var(--success); }
+        tr:nth-child(even) { background-color: #fafafa; }
 
-    .footer {
-      background: var(--white);
-      padding: 10px 40px;
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.9em;
-      color: var(--weg-gray);
-      border-top: 1px solid #ddd;
-    }
+        .status-badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            display: inline-block;
+        }
 
-    .sync-indicator { display: flex; align-items: center; gap: 8px; }
-    .dot { width: 10px; height: 10px; background: var(--success); border-radius: 50%; animation: pulse 2s infinite; }
+        .status-atrasado { background-color: #ffebee; color: var(--danger); border: 1px solid var(--danger); }
+        .status-ok { background-color: #e8f5e9; color: var(--success); border: 1px solid var(--success); }
 
-    @keyframes pulse {
-      0%   { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
-      70%  { transform: scale(1);    box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
-      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
-    }
+        .footer {
+            background: var(--white);
+            padding: 10px 40px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9em;
+            color: var(--weg-gray);
+            border-top: 1px solid #ddd;
+        }
 
-    /* Desativa a animação de entrada apenas durante refresh de dados */
-    .no-anim .slide { animation: none !important; }
-  </style>
+        .sync-indicator { display: flex; align-items: center; gap: 8px; }
+        .dot { width: 10px; height: 10px; background: var(--success); border-radius: 50%; animation: pulse 2s infinite; }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+        }
+
+        /* Desativa a animação de entrada apenas durante refresh de dados */
+        .no-anim .slide { animation: none !important; }
+    </style>
 </head>
 <body>
-  <header class="header">
-    <img src="weg_logo.png" alt="WEG Logo" class="logo-weg"
-         onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Weg_logo.svg/1200px-Weg_logo.svg.png'">
-    <div class="header-title">Controle Analítico Estanhagem</div>
-    <div class="header-right">
-      <div id="clock">00:00:00</div>
-      <div id="date">--/--/----</div>
-    </div>
-  </header>
+    <header class="header">
+        <img src="weg_logo.png" alt="WEG Logo" class="logo-weg"
+             onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Weg_logo.svg/1200px-Weg_logo.svg.png'">
+        <div class="header-title">Controle Analítico Estanhagem</div>
+        <div class="header-right">
+            <div id="clock">00:00:00</div>
+            <div id="date">--/--/----</div>
+        </div>
+    </header>
 
-  <main class="slide-container" id="slides"></main>
+    <main class="slide-container" id="slides"></main>
 
-  <footer class="footer">
-    <div class="sync-indicator">
-      <div class="dot"></div>
-      <span id="lastUpdate">Sincronizando dados...</span>
-    </div>
-    <div>Monitoramento em Tempo Real - WEG Industrial</div>
-  </footer>
+    <footer class="footer">
+        <div class="sync-indicator">
+            <div class="dot"></div>
+            <span id="lastUpdate">Sincronizando dados...</span>
+        </div>
+        <div>Monitoramento em Tempo Real - WEG Industrial</div>
+    </footer>
 
-  <script>
-    // --- Registro do plugin de anotação (necessário em Chart.js v4) ---
-    try {
-      if (window.Chart && (window['chartjs-plugin-annotation'] || window.ChartAnnotation)) {
-        Chart.register(window['chartjs-plugin-annotation'] || window.ChartAnnotation);
-      }
-    } catch (e) {
-      console.warn('Falha ao registrar plugin de anotação:', e);
-    }
-
-    let currentSlideIndex = 0;
-    let dataCache = null;
-    const chartsRegistry = new Map(); // id -> Chart instance
-
-    // Paleta fallback (se não houver mapeamento da série)
-    const wegColors = ['#00579d', '#00a1e4', '#58595b', '#808285'];
-
-    // Mapa de cores por Tanque -> Série (ajuste conforme preferir)
-    const colorMap = {
-      "Estanhagem A": {
-        "Sn (g/L)":      "#00579D",
-        "H2SO4 (mL/L)":  "#FF7F0E"
-      },
-      "Estanhagem B": {
-        "Sn (g/L)":      "#00579D",
-        "H2SO4 (mL/L)":  "#FF7F0E"
-      },
-      "Níquel WATT": {
-        "Niº (g/L)":     "#00579D",
-        "NiCl2 (mL/L)":  "#00A1E4",
-        "H3BO3 (g/L)":   "#9467BD"
-      },
-      "Desengraxante": {
-        "Concentração":                 "#00579D",
-        "Concentração do banho (mL/L)": "#00579D"
-      },
-      "Ativação - Tanque 5": {
-        "pH":        "#00A1E4",
-        "pH do banho":"#00A1E4"
-      },
-      "Ativação - Tanque 6": {
-        "Concentração (mL/L)":          "#00579D",
-        "Concentração do banho (mL/L)": "#00579D"
-      },
-      "Selante": {
-        "Concentração (%)": "#00A1E4",
-        "Concentração":     "#00A1E4"
-      }
-    };
-
-    // Limites de controle (mantidos do seu padrão)
-    const chartsControlLimits = {
-      "Desengraxante": { min: 30, max: 40 },
-      "Ativação - Tanque 5": { min: 0.5, max: 1.5 },
-      "Ativação - Tanque 6": { min: 30, max: 40 },
-      "Níquel WATT": {
-        "Niº (g/L)":   { min: 60, max: 80 },
-        "NiCl2 (mL/L)":{ min: 50, max: 70 },
-        "H3BO3 (g/L)": { min: 35, max: 45 }
-      },
-      "Estanhagem A": {
-        "Sn (g/L)":    { min: 20, max: 30 },
-        "H2SO4 (mL/L)":{" min": 50, "max": 70 }
-      },
-      "Estanhagem B": {
-        "Sn (g/L)":    { min: 20, max: 30 },
-        "H2SO4 (mL/L)":{" min": 50, "max": 70 }
-      }
-    };
-
-    // Mantém chave estável do slide ativo e último timestamp
-    let currentSlideKey = null;
-    let lastTimestamp = null;
-
-    // ---------------- Helpers gerais ----------------
-    const normalize = (s) => (s ?? '')
-      .toString()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[º°]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .toLowerCase();
-
-    function hexToRgba(hex, alpha = 0.1) {
-      const h = hex.replace('#', '');
-      const bigint = parseInt(h, 16);
-      if (h.length !== 6 || Number.isNaN(bigint)) return `rgba(0,0,0,${alpha})`;
-      const r = (bigint >> 16) & 255;
-      const g = (bigint >> 8) & 255;
-      const b = bigint & 255;
-      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    }
-
-    function getSeriesColor(tankName, seriesLabel, fallbackIndex) {
-      const t = colorMap[tankName] || null;
-      if (!t) return wegColors[fallbackIndex % wegColors.length];
-      if (t[seriesLabel]) return t[seriesLabel];
-
-      const nLabel = normalize(seriesLabel);
-      for (const [key, val] of Object.entries(t)) {
-        const nk = normalize(key);
-        if (nk === nLabel || nk.includes(nLabel) || nLabel.includes(nk)) return val;
-      }
-      return wegColors[fallbackIndex % wegColors.length];
-    }
-
-    function toNumber(v) {
-      if (typeof v === 'number') return v;
-      if (v == null) return null;
-      const s = String(v).replace(',', '.').trim();
-      const n = Number(s);
-      return Number.isFinite(n) ? n : null;
-    }
-
-    const slug = (s) => (s ?? '')
-      .toString()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^\w\s-]/g, '')
-      .trim()
-      .replace(/\s+/g, '-')
-      .toLowerCase();
-
-    function slideKey(slideObj) {
-      if (slideObj.tipo === 'capa') return 'capa';
-      const nomes = (slideObj.dados || []).map(d => d?.nome || '').map(slug);
-      return `analise:${nomes.join('|')}`;
-    }
-
-    function slideTanks(slideObj) {
-      if (slideObj.tipo === 'capa') return ['capa'];
-      return (slideObj.dados || []).map(d => slug(d?.nome || ''));
-    }
-
-    function buildSlidesData(cache) {
-      const analisesAll = Array.isArray(cache?.analises) ? cache.analises : [];
-      const capa = analisesAll.find(a => a?.tipo === 'capa');
-      const analises = analisesAll.filter(a => a?.tipo === 'analise');
-
-      const slidesData = [];
-      if (capa) slidesData.push({ tipo: 'capa', dados: capa });
-      for (let i = 0; i < analises.length; i += 2) {
-        slidesData.push({ tipo: 'analise', dados: analises.slice(i, i + 2) });
-      }
-      return slidesData;
-    }
-
-    // --- Rotulagem curta e unidade no cabeçalho da tabela ---
-    function headerShort(label = '') {
-      const l = normalize(label);
-      if (/^nicl2/.test(l)) return 'NiCl2';
-      if (/^ni(º|o)/.test(l) || l.includes('niº')) return 'Niº';
-      if (l.includes('h3bo3')) return 'H3BO3';
-      if (l.includes('h2so4')) return 'H2SO4';
-      if (l.startsWith('ph'))  return 'pH';
-      if (l.includes('sn'))    return 'Sn';
-      if (l.includes('concentração do banho') || l.includes('concentracao do banho')) return 'Concentração';
-      return (label || '').split(' ')[0] || '—';
-    }
-
-    function headerUnit(label = '') {
-      const l = normalize(label);
-      if (l.includes('(g/l)'))  return '(g/L)';
-      if (l.includes('(ml/l)')) return '(mL/L)';
-      if (l.includes('%'))      return '(%)';
-      if (l.startsWith('ph'))   return '';
-      return '';
-    }
-
-    function getTableColgroupHtml(dsCount) {
-      const dateWidth = dsCount <= 2 ? 40 : (dsCount === 3 ? 32 : 28);
-      const each = ((100 - dateWidth) / dsCount).toFixed(2);
-      const cols = [`<col style="width:${dateWidth}%">`];
-      for (let i = 0; i < dsCount; i++) cols.push(`<col style="width:${each}%">`);
-      return `<colgroup>${cols.join('')}</colgroup>`;
-    }
-
-    function isNumericLike(v) {
-      if (v == null) return false;
-      const s = String(v).replace(',', '.').trim();
-      return s !== '' && !Number.isNaN(Number(s));
-    }
-
-    // ---------------- Fetch de dados ----------------
-    async function fetchData() {
-      try {
-        const base = (window.location && window.location.origin && window.location.origin !== 'null')
-          ? window.location.origin : '';
-        const API_URL = base + '/api/dados';
-
-        const res = await fetch(API_URL, { cache: 'no-store' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-        const json = await res.json();
-        const ts = json?.timestamp ? new Date(json.timestamp) : new Date();
-
-        // Evita reconstruir se nada mudou
-        if (lastTimestamp && new Date(lastTimestamp).getTime() === ts.getTime()) {
-          document.getElementById('lastUpdate').textContent =
-            `Última Atualização: ${ts.toLocaleString('pt-BR')} (sem alterações)`;
-          return;
+    <script>
+        // --- Registro do plugin de anotação (necessário em Chart.js v4) ---
+        try {
+            if (window.Chart && (window['chartjs-plugin-annotation'] || window.ChartAnnotation)) {
+                Chart.register(window['chartjs-plugin-annotation'] || window.ChartAnnotation);
+            }
+        } catch (e) {
+            console.warn('Falha ao registrar plugin de anotação:', e);
         }
 
-        dataCache = json;
-        lastTimestamp = ts.toISOString();
+        let currentSlideIndex = 0;
+        let dataCache = null;
+        const wegColors = ['#00579d', '#00a1e4', '#58595b', '#808285'];
+        const chartsRegistry = new Map(); // id -> Chart instance
 
-        document.getElementById('lastUpdate').textContent =
-          `Última Atualização: ${ts.toLocaleString('pt-BR')}`;
+        // Mantém chave e contexto do slide ativo
+        let currentSlideKey = null;
+        let lastTimestamp = null;
 
-        setupSlides({ preserveActive: true });
-
-      } catch (e) {
-        console.error("Erro ao buscar dados", e);
-        document.getElementById('lastUpdate').textContent = 'Erro ao carregar dados. Aguardando Excel...';
-      }
-    }
-
-    function destroyAllCharts() {
-      for (const [, chart] of chartsRegistry) {
-        try { chart.destroy(); } catch {}
-      }
-      chartsRegistry.clear();
-    }
-
-    // ---------------- Montagem dos slides ----------------
-    function setupSlides({ preserveActive = true } = {}) {
-      const container = document.getElementById('slides');
-
-      // Captura contexto do slide ativo
-      let prevKey = null;
-      let prevTanks = [];
-      if (preserveActive) {
-        const slides = document.querySelectorAll('.slide');
-        if (slides.length) {
-          const active = slides[currentSlideIndex] || slides[0];
-          prevKey = active?.dataset?.key || currentSlideKey;
-
-          // Tanques do slide ativo atual (lendo títulos)
-          const titles = Array.from(active?.querySelectorAll('.card .card-title') || [])
-            .map(el => slug(el.textContent || ''))
-            .filter(s => s && s !== 'resumo-de-status-das-analises');
-          prevTanks = titles.length ? titles : (prevKey ? [prevKey] : []);
-        }
-      }
-
-      const slidesData = buildSlidesData(dataCache);
-
-      destroyAllCharts();
-      container.classList.add('no-anim');
-      container.innerHTML = '';
-
-      if (slidesData.length === 0) {
-        const noSlide = document.createElement('div');
-        noSlide.className = 'slide active full-slide';
-        noSlide.dataset.key = 'sem-dados';
-        noSlide.dataset.tanks = 'sem-dados';
-        noSlide.innerHTML = `
-          <div class="card">
-            <div class="card-title">Sem dados disponíveis</div>
-            <div style="flex:1;display:flex;align-items:center;justify-content:center;color:#666;">
-              Aguarde a sincronização com o Excel/API.
-            </div>
-          </div>`;
-        container.appendChild(noSlide);
-        currentSlideIndex = 0;
-        currentSlideKey = 'sem-dados';
-        container.offsetHeight;
-        container.classList.remove('no-anim');
-        return;
-      }
-
-      const newSlides = [];
-      slidesData.forEach((slideObj) => {
-        const slide = document.createElement('div');
-        slide.className = 'slide';
-
-        const key = slideKey(slideObj);
-        const tanks = slideTanks(slideObj);
-
-        slide.dataset.key = key;
-        slide.dataset.tanks = tanks.join(',');
-
-        if (slideObj.tipo === 'capa') {
-          slide.classList.add('full-slide');
-          const statusData = Array.isArray(slideObj.dados?.status_data) ? slideObj.dados.status_data : [];
-          const rows = statusData.map(s => `
-            <tr>
-              <td style="font-weight:700;color:var(--weg-blue);text-align:left;">${s?.tanque ?? '-'}</td>
-              <td style="text-align:center;font-weight:600;">${s?.proxima ?? '-'}</td>
-              <td style="text-align:center;">
-                <span class="status-badge ${(s?.status || '').includes('ATRASADO') ? 'status-atrasado' : 'status-ok'}">
-                  ${s?.status ?? '—'}
-                </span>
-              </td>
-            </tr>`).join('');
-
-          slide.innerHTML = `
-            <div class="card">
-              <div class="card-title">Resumo de Status das Análises</div>
-              <div style="flex:1;display:flex;align-items:center;">
-                <table>
-                  <thead>
-                    <tr>
-                      <th style="text-align:left;">EQUIPAMENTO / TANQUE</th>
-                      <th style="text-align:center;">PRÓXIMA ANÁLISE</th>
-                      <th style="text-align:center;">STATUS ATUAL</th>
-                    </tr>
-                  </thead>
-                  <tbody>${rows}</tbody>
-                </table>
-              </div>
-            </div>`;
-        } else {
-          const cards = Array.isArray(slideObj.dados) ? slideObj.dados : [];
-          cards.forEach((ana) => {
-            const card = document.createElement('div');
-            card.className = 'card';
-
-            const canvasId = `chart-${slug(ana?.nome)}`;
-            const dsArr = Array.isArray(ana?.chart_data?.datasets) ? ana.chart_data.datasets : [];
-
-            // Cabeçalhos curtos + unidades
-            const headers = dsArr.map(ds => {
-              const raw  = (ds?.label ?? '').toString();
-              const main = headerShort(raw);
-              const unit = headerUnit(raw);
-              return `<th>
-                        <div class="th-main">${main}</div>
-                        ${unit ? `<div class="th-sub">${unit}</div>` : ''}
-                      </th>`;
-            }).join('');
-
-            // Linhas (numéricos com fonte tabular)
-            const ult = Array.isArray(ana?.ultimas_analises) ? ana.ultimas_analises : [];
-            const rows = ult.map(r => {
-              let vals = '';
-              for (let k = 1; k <= dsArr.length; k++) {
-                const val = r?.[`Val${k}`];
-                const cls = isNumericLike(val) ? 'numeric' : '';
-                vals += `<td class="${cls}">${val ?? '—'}</td>`;
-              }
-              return `<tr><td style="font-weight:600;">${r?.Data ?? '-'}</td>${vals}</tr>`;
-            }).join('');
-
-            card.innerHTML = `
-              <div class="card-title">${ana?.nome ?? '—'}</div>
-              <div class="chart-wrapper"><canvas id="${canvasId}"></canvas></div>
-              <table>
-                ${getTableColgroupHtml(dsArr.length)}
-                <thead><tr><th>DATA</th>${headers}</tr></thead>
-                <tbody>${rows}</tbody>
-              </table>`;
-
-            requestAnimationFrame(() => renderChart(canvasId, ana?.chart_data, ana?.nome));
-            slide.appendChild(card);
-          });
-        }
-
-        container.appendChild(slide);
-        newSlides.push(slide);
-      });
-
-      // Reativar o mesmo slide (por key; fallback por tanques)
-      let newIndex = 0;
-      if (preserveActive) {
-        if (prevKey) {
-          const idxByKey = newSlides.findIndex(s => s.dataset.key === prevKey);
-          if (idxByKey >= 0) newIndex = idxByKey;
-          else {
-            const prevSet = new Set(prevTanks);
-            let bestIdx = 0, bestScore = -1;
-            newSlides.forEach((s, i) => {
-              const tanks = (s.dataset.tanks || '').split(',').filter(Boolean);
-              const score = tanks.reduce((acc, t) => acc + (prevSet.has(t) ? 1 : 0), 0);
-              if (score > bestScore) { bestScore = score; bestIdx = i; }
-            });
-            newIndex = bestIdx;
-          }
-        }
-      }
-
-      newSlides.forEach(s => s.classList.remove('active'));
-      if (newSlides[newIndex]) {
-        newSlides[newIndex].classList.add('active');
-        currentSlideIndex = newIndex;
-        currentSlideKey = newSlides[newIndex].dataset.key;
-      }
-
-      container.offsetHeight; // reflow
-      container.classList.remove('no-anim');
-    }
-
-    // ---------------- Gráficos ----------------
-    function getLimitsFor(tankName, datasetLabel) {
-      const lim = chartsControlLimits?.[tankName];
-      if (!lim) return null;
-      if (typeof lim.min === 'number' || typeof lim.max === 'number') return lim;
-
-      const nLabel = normalize(datasetLabel);
-      for (const key of Object.keys(lim)) {
-        const nKey = normalize(key);
-        if (nKey === nLabel || nKey.includes(nLabel) || nLabel.includes(nKey)) {
-          return lim[key];
-        }
-      }
-      return lim[Object.keys(lim)[0]];
-    }
-
-    function renderChart(id, chartData, tankName) {
-      const canvas = document.getElementById(id);
-      if (!canvas) return;
-
-      const labels = Array.isArray(chartData?.labels) ? chartData.labels : [];
-      const dsArr  = Array.isArray(chartData?.datasets) ? chartData.datasets : [];
-      if (dsArr.length === 0) return;
-
-      // Faixa ideal
-      let ann = {};
-      const firstLabel = dsArr[0]?.label ?? '';
-      const limits = getLimitsFor(tankName, firstLabel);
-
-      if (limits && (typeof limits.min === 'number') && (typeof limits.max === 'number')) {
-        ann.idealBox = {
-          type: 'box',
-          yMin: limits.min,
-          yMax: limits.max,
-          backgroundColor: 'rgba(40, 167, 69, 0.15)',
-          borderColor: 'rgba(40, 167, 69, 0.3)',
-          borderWidth: 1
-        };
-      }
-
-      const cfg = {
-        type: 'line',
-        data: {
-          labels,
-          datasets: dsArr.map((ds, i) => {
-            const seriesLabel = ds?.label ?? `Série ${i + 1}`;
-            const color = getSeriesColor(tankName, seriesLabel, i);
-            const dataPoints = Array.isArray(ds?.data) ? ds.data.map(toNumber) : [];
-            return {
-              label: seriesLabel,
-              data: dataPoints,
-              borderColor: color,
-              pointBackgroundColor: color,
-              backgroundColor: i === 0 ? hexToRgba(color, 0.08) : 'transparent',
-              borderWidth: 4,
-              pointRadius: 6,
-              tension: 0.3,
-              fill: i === 0
-            };
-          })
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          layout: { padding: { top: 8 } },
-          plugins: {
-            legend: {
-              position: 'top',
-              align: 'center',
-              labels: { usePointStyle: true, boxWidth: 14, boxHeight: 14, padding: 16, font: { size: 12, weight: 'bold' } }
+        // Limites de controle (mantidos)
+        const controlLimits = {
+            "Desengraxante": { min: 30, max: 40 },
+            "Ativação - Tanque 5": { min: 0.5, max: 1.5 },
+            "Ativação - Tanque 6": { min: 30, max: 40 },
+            "Níquel WATT": {
+                "Niº (g/L)": { min: 60, max: 80 },
+                "NiCl2 (mL/L)": { min: 50, max: 70 },
+                "H3BO3 (g/L)": { min: 35, max: 45 }
             },
-            annotation: { annotations: ann }
-          },
-          scales: {
-            y: { grid: { color: '#eee' }, ticks: { color: '#666', font: { weight: 'bold' } } },
-            x: { grid: { display: false }, ticks: { color: '#666', font: { weight: 'bold' } } }
-          }
+            "Estanhagem A": {
+                "Sn (g/L)": { min: 20, max: 30 },
+                "H2SO4 (mL/L)": { min: 50, max: 70 }
+            },
+            "Estanhagem B": {
+                "Sn (g/L)": { min: 20, max: 30 },
+                "H2SO4 (mL/L)": { min: 50, max: 70 }
+            }
+        };
+
+        // --- Helpers ---
+        const normalize = (s) => (s ?? '')
+            .toString()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/[º°]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .toLowerCase();
+
+        function getLimitsFor(tankName, datasetLabel) {
+            const lim = controlLimits?.[tankName];
+            if (!lim) return null;
+            if (typeof lim.min === 'number' || typeof lim.max === 'number') return lim;
+
+            const nLabel = normalize(datasetLabel);
+            let found = null;
+            for (const key of Object.keys(lim)) {
+                const nKey = normalize(key);
+                if (nKey === nLabel || nKey.includes(nLabel) || nLabel.includes(nKey)) {
+                    found = lim[key]; break;
+                }
+            }
+            return found ?? lim[Object.keys(lim)[0]];
         }
-      };
 
-      try {
-        const chart = new Chart(canvas.getContext('2d'), cfg);
-        chartsRegistry.set(id, chart);
-      } catch (e) {
-        console.error('Erro ao renderizar gráfico', e);
-      }
-    }
+        function toNumber(v) {
+            if (typeof v === 'number') return v;
+            if (v == null) return null;
+            const s = String(v).replace(',', '.').trim();
+            const n = Number(s);
+            return Number.isFinite(n) ? n : null;
+        }
 
-    function nextSlide() {
-      const slides = document.querySelectorAll('.slide');
-      if (slides.length <= 1) return;
-      slides[currentSlideIndex].classList.remove('active');
-      currentSlideIndex = (currentSlideIndex + 1) % slides.length;
-      const active = slides[currentSlideIndex];
-      active.classList.add('active');
-      currentSlideKey = active?.dataset?.key || null;
-    }
+        // ID estável a partir do nome (para canvas e identificação do slide)
+        const slug = (s) => (s ?? '')
+          .toString()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^\w\s-]/g, '')
+          .trim()
+          .replace(/\s+/g, '-')
+          .toLowerCase();
 
-    function updateClock() {
-      const now = new Date();
-      document.getElementById('clock').textContent = now.toLocaleTimeString('pt-BR');
-      document.getElementById('date').textContent = now.toLocaleDateString('pt-BR', {
-        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-      });
-    }
+        // Gera uma chave estável para o slide, baseada no tipo e nomes dos tanques
+        function slideKey(slideObj) {
+            if (slideObj.tipo === 'capa') return 'capa';
+            const nomes = (slideObj.dados || []).map(d => d?.nome || '').map(slug);
+            return `analise:${nomes.join('|')}`;
+        }
 
-    // Timers
-    setInterval(updateClock, 1000);
-    setInterval(nextSlide, 20000);
-    setInterval(fetchData, 60000); // se quiser, use 61000 para “desalinha-lo” dos 20s
+        // Tanques (slugs) que um slide contém (para fallback de preservação)
+        function slideTanks(slideObj) {
+            if (slideObj.tipo === 'capa') return ['capa'];
+            return (slideObj.dados || []).map(d => slug(d?.nome || ''));
+        }
 
-    // Boot
-    updateClock();
-    fetchData();
-  </script>
+        // Constrói a estrutura dos slides (capa + pares)
+        function buildSlidesData(cache) {
+            const analisesAll = Array.isArray(cache?.analises) ? cache.analises : [];
+            const capa = analisesAll.find(a => a?.tipo === 'capa');
+            const analises = analisesAll.filter(a => a?.tipo === 'analise');
+
+            const slidesData = [];
+            if (capa) slidesData.push({ tipo: 'capa', dados: capa });
+            for (let i = 0; i < analises.length; i += 2) {
+                slidesData.push({ tipo: 'analise', dados: analises.slice(i, i + 2) });
+            }
+            return slidesData;
+        }
+
+        async function fetchData() {
+            try {
+                const base = (window.location && window.location.origin && window.location.origin !== 'null')
+                    ? window.location.origin
+                    : '';
+                const API_URL = base + '/api/dados';
+
+                const res = await fetch(API_URL, { cache: 'no-store' });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                const json = await res.json();
+                const ts = json?.timestamp ? new Date(json.timestamp) : new Date();
+
+                // Evita reconstruir se nada mudou (reduz piscadas)
+                if (lastTimestamp && new Date(lastTimestamp).getTime() === ts.getTime()) {
+                    document.getElementById('lastUpdate').textContent =
+                        `Última Atualização: ${ts.toLocaleString('pt-BR')} (sem alterações)`;
+                    return;
+                }
+
+                dataCache = json;
+                lastTimestamp = ts.toISOString();
+
+                document.getElementById('lastUpdate').textContent =
+                    `Última Atualização: ${ts.toLocaleString('pt-BR')}`;
+
+                // Reconstrói preservando o slide ativo (com fallback por tanques)
+                setupSlides({ preserveActive: true });
+
+            } catch (e) {
+                console.error("Erro ao buscar dados", e);
+                document.getElementById('lastUpdate').textContent = 'Erro ao carregar dados. Aguardando Excel...';
+            }
+        }
+
+        function destroyAllCharts() {
+            for (const [, chart] of chartsRegistry) {
+                try { chart.destroy(); } catch {}
+            }
+            chartsRegistry.clear();
+        }
+
+        function setupSlides({ preserveActive = true } = {}) {
+            const container = document.getElementById('slides');
+
+            // 1) Capturar contexto do slide ativo (key + tanques) antes de apagar
+            let prevKey = null;
+            let prevTanks = [];
+            if (preserveActive) {
+                const slides = document.querySelectorAll('.slide');
+                if (slides.length) {
+                    const active = slides[currentSlideIndex] || slides[0];
+                    prevKey = active?.dataset?.key || currentSlideKey;
+
+                    // Extrai tanques do slide ativo atual via DOM (titulos dos cards)
+                    const titles = Array.from(active?.querySelectorAll('.card .card-title') || [])
+                        .map(el => slug(el.textContent || ''))
+                        .filter(s => s && s !== 'resumo-de-status-das-analises'); // ignora capa
+                    prevTanks = titles.length ? titles : (prevKey ? [prevKey] : []);
+                }
+            }
+
+            // 2) Montar nova estrutura de dados (capa + pares)
+            const slidesData = buildSlidesData(dataCache);
+
+            // 3) Destruir charts antigos para não vazar memória
+            destroyAllCharts();
+
+            // 4) Reconstruir DOM sem animação durante o refresh
+            container.classList.add('no-anim');
+            container.innerHTML = '';
+
+            if (slidesData.length === 0) {
+                const noSlide = document.createElement('div');
+                noSlide.className = 'slide active full-slide';
+                noSlide.dataset.key = 'sem-dados';
+                noSlide.dataset.tanks = 'sem-dados';
+                noSlide.innerHTML = `
+                    <div class="card">
+                        <div class="card-title">Sem dados disponíveis</div>
+                        <div style="flex:1;display:flex;align-items:center;justify-content:center;color:#666;">
+                            Aguarde a sincronização com o Excel/API.
+                        </div>
+                    </div>`;
+                container.appendChild(noSlide);
+                currentSlideIndex = 0;
+                currentSlideKey = 'sem-dados';
+                container.offsetHeight; // reflow
+                container.classList.remove('no-anim');
+                return;
+            }
+
+            // 5) Criar slides
+            const newSlides = [];
+            slidesData.forEach((slideObj) => {
+                const slide = document.createElement('div');
+                slide.className = 'slide';
+
+                const key = slideKey(slideObj);
+                const tanks = slideTanks(slideObj);
+
+                slide.dataset.key = key;
+                slide.dataset.tanks = tanks.join(',');
+
+                if (slideObj.tipo === 'capa') {
+                    slide.classList.add('full-slide');
+                    const statusData = Array.isArray(slideObj.dados?.status_data) ? slideObj.dados.status_data : [];
+                    const rows = statusData.map(s => `
+                        <tr>
+                            <td style="font-weight:700;color:var(--weg-blue);text-align:left;">${s?.tanque ?? '-'}</td>
+                            <td style="text-align:center;font-weight:600;">${s?.proxima ?? '-'}</td>
+                            <td style="text-align:center;">
+                                <span class="status-badge ${(s?.status || '').includes('ATRASADO') ? 'status-atrasado' : 'status-ok'}">
+                                    ${s?.status ?? '—'}
+                                </span>
+                            </td>
+                        </tr>`).join('');
+
+                    slide.innerHTML = `
+                        <div class="card">
+                            <div class="card-title">Resumo de Status das Análises</div>
+                            <div style="flex:1;display:flex;align-items:center;">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th style="text-align:left;">EQUIPAMENTO / TANQUE</th>
+                                            <th style="text-align:center;">PRÓXIMA ANÁLISE</th>
+                                            <th style="text-align:center;">STATUS ATUAL</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>${rows}</tbody>
+                                </table>
+                            </div>
+                        </div>`;
+                } else {
+                    const cards = Array.isArray(slideObj.dados) ? slideObj.dados : [];
+                    cards.forEach((ana) => {
+                        const card = document.createElement('div');
+                        card.className = 'card';
+
+                        // ID estável por nome
+                        const canvasId = `chart-${slug(ana?.nome)}`;
+
+                        const dsArr = Array.isArray(ana?.chart_data?.datasets) ? ana.chart_data.datasets : [];
+                        const headers = dsArr.map(ds => {
+                            const label = (ds?.label ?? '').toString();
+                            const short = label.split(' ')[0] || label;
+                            return `<th style="text-align:center;">${short}</th>`;
+                        }).join('');
+
+                        const ult = Array.isArray(ana?.ultimas_analises) ? ana.ultimas_analises : [];
+                        const rows = ult.map(r => {
+                            let vals = '';
+                            for (let k = 1; k <= dsArr.length; k++) {
+                                const val = r?.[`Val${k}`];
+                                vals += `<td style="text-align:center;font-weight:600;">${val ?? '—'}</td>`;
+                            }
+                            return `<tr><td style="font-weight:600;">${r?.Data ?? '-'}</td>${vals}</tr>`;
+                        }).join('');
+
+                        card.innerHTML = `
+                            <div class="card-title">${ana?.nome ?? '—'}</div>
+                            <div class="chart-wrapper"><canvas id="${canvasId}"></canvas></div>
+                            <table>
+                                <thead><tr><th>DATA</th>${headers}</tr></thead>
+                                <tbody>${rows}</tbody>
+                            </table>`;
+
+                        requestAnimationFrame(() => renderChart(canvasId, ana?.chart_data, ana?.nome));
+
+                        slide.appendChild(card);
+                    });
+                }
+
+                container.appendChild(slide);
+                newSlides.push(slide);
+            });
+
+            // 6) Reativar o mesmo slide de antes:
+            //    a) tenta pela key; b) se não achar, pelo melhor "match" de tanques
+            let newIndex = 0;
+
+            if (preserveActive) {
+                // a) por key
+                if (prevKey) {
+                    const idxByKey = newSlides.findIndex(s => s.dataset.key === prevKey);
+                    if (idxByKey >= 0) newIndex = idxByKey;
+                    else {
+                        // b) por "overlap" de tanques
+                        const prevSet = new Set(prevTanks);
+                        let bestIdx = 0, bestScore = -1;
+                        newSlides.forEach((s, i) => {
+                            const tanks = (s.dataset.tanks || '').split(',').filter(Boolean);
+                            const score = tanks.reduce((acc, t) => acc + (prevSet.has(t) ? 1 : 0), 0);
+                            if (score > bestScore) {
+                                bestScore = score; bestIdx = i;
+                            }
+                        });
+                        newIndex = bestIdx;
+                    }
+                }
+            }
+
+            newSlides.forEach(s => s.classList.remove('active'));
+            if (newSlides[newIndex]) {
+                newSlides[newIndex].classList.add('active');
+                currentSlideIndex = newIndex;
+                currentSlideKey = newSlides[newIndex].dataset.key;
+            }
+
+            // 7) Reabilitar animação para a rotação normal
+            container.offsetHeight; // reflow
+            container.classList.remove('no-anim');
+        }
+
+        function renderChart(id, chartData, tankName) {
+            const canvas = document.getElementById(id);
+            if (!canvas) return;
+
+            const labels = Array.isArray(chartData?.labels) ? chartData.labels : [];
+            const dsArr = Array.isArray(chartData?.datasets) ? chartData.datasets : [];
+            if (dsArr.length === 0) return;
+
+            // Anotação (faixa ideal)
+            let ann = {};
+            const firstLabel = dsArr[0]?.label ?? '';
+            const limits = getLimitsFor(tankName, firstLabel);
+
+            if (limits && (typeof limits.min === 'number') && (typeof limits.max === 'number')) {
+                ann.idealBox = {
+                    type: 'box',
+                    yMin: limits.min,
+                    yMax: limits.max,
+                    backgroundColor: 'rgba(40, 167, 69, 0.15)',
+                    borderColor: 'rgba(40, 167, 69, 0.3)',
+                    borderWidth: 1
+                };
+            }
+
+            const cfg = {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: dsArr.map((ds, i) => {
+                        const color = wegColors[i % wegColors.length];
+                        const dataPoints = Array.isArray(ds?.data) ? ds.data.map(toNumber) : [];
+                        return {
+                            label: ds?.label ?? `Série ${i + 1}`,
+                            data: dataPoints,
+                            borderColor: color,
+                            backgroundColor: i === 0 ? 'rgba(0, 87, 157, 0.05)' : 'transparent',
+                            borderWidth: 4,
+                            pointRadius: 6,
+                            pointBackgroundColor: color,
+                            tension: 0.3,
+                            fill: i === 0
+                        };
+                    })
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: { usePointStyle: true, font: { size: 12, weight: 'bold' } }
+                        },
+                        annotation: { annotations: ann }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: '#eee' },
+                            ticks: { color: '#666', font: { weight: 'bold' } }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#666', font: { weight: 'bold' } }
+                        }
+                    }
+                }
+            };
+
+            try {
+                const chart = new Chart(canvas.getContext('2d'), cfg);
+                chartsRegistry.set(id, chart);
+            } catch (e) {
+                console.error('Erro ao renderizar gráfico', e);
+            }
+        }
+
+        function nextSlide() {
+            const slides = document.querySelectorAll('.slide');
+            if (slides.length <= 1) return;
+            slides[currentSlideIndex].classList.remove('active');
+            currentSlideIndex = (currentSlideIndex + 1) % slides.length;
+            const active = slides[currentSlideIndex];
+            active.classList.add('active');
+            currentSlideKey = active?.dataset?.key || null;
+        }
+
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').textContent = now.toLocaleTimeString('pt-BR');
+            document.getElementById('date').textContent = now.toLocaleDateString('pt-BR', {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+            });
+        }
+
+        // Timers
+        setInterval(updateClock, 1000);
+        setInterval(nextSlide, 20000);
+        setInterval(fetchData, 60000); // Se quiser desalinhar 100%, troque para 61000
+
+        // Boot
+        updateClock();
+        fetchData();
+    </script>
 </body>
 </html>
