@@ -197,7 +197,7 @@
         const wegColors = ['#00579d', '#00a1e4', '#58595b', '#808285'];
         const chartsRegistry = new Map(); // id -> Chart instance
 
-        // Mantém chave estável do slide ativo e último timestamp recebido
+        // Mantém chave e contexto do slide ativo
         let currentSlideKey = null;
         let lastTimestamp = null;
 
@@ -221,37 +221,28 @@
             }
         };
 
-        // --- Helpers robustos ---
+        // --- Helpers ---
         const normalize = (s) => (s ?? '')
             .toString()
-            .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
-            .replace(/[º°]/g, '') // remove símbolos grau/ordinal
-            .replace(/\s+/g, ' ') // espaços múltiplos -> 1
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/[º°]/g, '')
+            .replace(/\s+/g, ' ')
             .trim()
             .toLowerCase();
 
         function getLimitsFor(tankName, datasetLabel) {
             const lim = controlLimits?.[tankName];
             if (!lim) return null;
+            if (typeof lim.min === 'number' || typeof lim.max === 'number') return lim;
 
-            // Caso simples (um único range min/max)
-            if (typeof lim.min === 'number' || typeof lim.max === 'number') {
-                return lim;
-            }
-
-            // Caso multi-parâmetro: busca flexível por chave
             const nLabel = normalize(datasetLabel);
             let found = null;
-
             for (const key of Object.keys(lim)) {
                 const nKey = normalize(key);
                 if (nKey === nLabel || nKey.includes(nLabel) || nLabel.includes(nKey)) {
-                    found = lim[key];
-                    break;
+                    found = lim[key]; break;
                 }
             }
-
-            // Fallback: primeiro parâmetro se não achou correspondência
             return found ?? lim[Object.keys(lim)[0]];
         }
 
@@ -277,6 +268,12 @@
             if (slideObj.tipo === 'capa') return 'capa';
             const nomes = (slideObj.dados || []).map(d => d?.nome || '').map(slug);
             return `analise:${nomes.join('|')}`;
+        }
+
+        // Tanques (slugs) que um slide contém (para fallback de preservação)
+        function slideTanks(slideObj) {
+            if (slideObj.tipo === 'capa') return ['capa'];
+            return (slideObj.dados || []).map(d => slug(d?.nome || ''));
         }
 
         // Constrói a estrutura dos slides (capa + pares)
@@ -319,7 +316,7 @@
                 document.getElementById('lastUpdate').textContent =
                     `Última Atualização: ${ts.toLocaleString('pt-BR')}`;
 
-                // Reconstrói preservando o slide ativo
+                // Reconstrói preservando o slide ativo (com fallback por tanques)
                 setupSlides({ preserveActive: true });
 
             } catch (e) {
@@ -338,13 +335,20 @@
         function setupSlides({ preserveActive = true } = {}) {
             const container = document.getElementById('slides');
 
-            // 1) Capturar a key do slide ativo (antes de apagar)
+            // 1) Capturar contexto do slide ativo (key + tanques) antes de apagar
             let prevKey = null;
+            let prevTanks = [];
             if (preserveActive) {
                 const slides = document.querySelectorAll('.slide');
                 if (slides.length) {
                     const active = slides[currentSlideIndex] || slides[0];
                     prevKey = active?.dataset?.key || currentSlideKey;
+
+                    // Extrai tanques do slide ativo atual via DOM (titulos dos cards)
+                    const titles = Array.from(active?.querySelectorAll('.card .card-title') || [])
+                        .map(el => slug(el.textContent || ''))
+                        .filter(s => s && s !== 'resumo-de-status-das-analises'); // ignora capa
+                    prevTanks = titles.length ? titles : (prevKey ? [prevKey] : []);
                 }
             }
 
@@ -362,6 +366,7 @@
                 const noSlide = document.createElement('div');
                 noSlide.className = 'slide active full-slide';
                 noSlide.dataset.key = 'sem-dados';
+                noSlide.dataset.tanks = 'sem-dados';
                 noSlide.innerHTML = `
                     <div class="card">
                         <div class="card-title">Sem dados disponíveis</div>
@@ -378,11 +383,16 @@
             }
 
             // 5) Criar slides
+            const newSlides = [];
             slidesData.forEach((slideObj) => {
                 const slide = document.createElement('div');
                 slide.className = 'slide';
+
                 const key = slideKey(slideObj);
+                const tanks = slideTanks(slideObj);
+
                 slide.dataset.key = key;
+                slide.dataset.tanks = tanks.join(',');
 
                 if (slideObj.tipo === 'capa') {
                     slide.classList.add('full-slide');
@@ -420,7 +430,7 @@
                         const card = document.createElement('div');
                         card.className = 'card';
 
-                        // >>> ID estável por nome (evita re-criação e “piscar”)
+                        // ID estável por nome
                         const canvasId = `chart-${slug(ana?.nome)}`;
 
                         const dsArr = Array.isArray(ana?.chart_data?.datasets) ? ana.chart_data.datasets : [];
@@ -448,23 +458,41 @@
                                 <tbody>${rows}</tbody>
                             </table>`;
 
-                        // Garante que o canvas exista antes de renderizar
                         requestAnimationFrame(() => renderChart(canvasId, ana?.chart_data, ana?.nome));
 
                         slide.appendChild(card);
                     });
                 }
 
-                document.getElementById('slides').appendChild(slide);
+                container.appendChild(slide);
+                newSlides.push(slide);
             });
 
-            // 6) Reativar o mesmo slide de antes (se existir), senão o primeiro
-            const newSlides = Array.from(container.querySelectorAll('.slide'));
+            // 6) Reativar o mesmo slide de antes:
+            //    a) tenta pela key; b) se não achar, pelo melhor "match" de tanques
             let newIndex = 0;
-            if (preserveActive && prevKey) {
-                const idx = newSlides.findIndex(s => s.dataset.key === prevKey);
-                newIndex = idx >= 0 ? idx : 0;
+
+            if (preserveActive) {
+                // a) por key
+                if (prevKey) {
+                    const idxByKey = newSlides.findIndex(s => s.dataset.key === prevKey);
+                    if (idxByKey >= 0) newIndex = idxByKey;
+                    else {
+                        // b) por "overlap" de tanques
+                        const prevSet = new Set(prevTanks);
+                        let bestIdx = 0, bestScore = -1;
+                        newSlides.forEach((s, i) => {
+                            const tanks = (s.dataset.tanks || '').split(',').filter(Boolean);
+                            const score = tanks.reduce((acc, t) => acc + (prevSet.has(t) ? 1 : 0), 0);
+                            if (score > bestScore) {
+                                bestScore = score; bestIdx = i;
+                            }
+                        });
+                        newIndex = bestIdx;
+                    }
+                }
             }
+
             newSlides.forEach(s => s.classList.remove('active'));
             if (newSlides[newIndex]) {
                 newSlides[newIndex].classList.add('active');
@@ -483,12 +511,9 @@
 
             const labels = Array.isArray(chartData?.labels) ? chartData.labels : [];
             const dsArr = Array.isArray(chartData?.datasets) ? chartData.datasets : [];
-            if (dsArr.length === 0) {
-                // Sem datasets, não renderiza
-                return;
-            }
+            if (dsArr.length === 0) return;
 
-            // Prepara anotações (faixa ideal)
+            // Anotação (faixa ideal)
             let ann = {};
             const firstLabel = dsArr[0]?.label ?? '';
             const limits = getLimitsFor(tankName, firstLabel);
@@ -576,7 +601,7 @@
         // Timers
         setInterval(updateClock, 1000);
         setInterval(nextSlide, 20000);
-        setInterval(fetchData, 60000);
+        setInterval(fetchData, 60000); // Se quiser desalinhar 100%, troque para 61000
 
         // Boot
         updateClock();
@@ -584,3 +609,4 @@
     </script>
 </body>
 </html>
+``
