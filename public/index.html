@@ -123,12 +123,18 @@
             color: #333;
         }
 
-        /* Alinhamento consistente: tudo centralizado, 1ª coluna à esquerda */
-        th, td {
-            text-align: center !important;
+        /* Padrão: centralizado para todos */
+        th, td { text-align: center; }
+
+        /* Capa: 1ª coluna à esquerda (tanque/equipamento) */
+        table.tbl-capa th:first-child,
+        table.tbl-capa td:first-child {
+            text-align: left;
         }
-        th:first-child, td:first-child {
-            text-align: left !important;
+
+        /* Análises (gráficos): manter todas as colunas centralizadas, inclusive DATA */
+        table.tbl-analises th, table.tbl-analises td {
+            text-align: center;
         }
 
         tr:nth-child(even) { background-color: #fafafa; }
@@ -200,6 +206,10 @@
         let dataCache = null;
         const wegColors = ['#00579d', '#00a1e4', '#58595b', '#808285'];
         const chartsRegistry = new Map(); // id -> Chart instance
+
+        // Slideshow com tempo fixo por slide
+        const SLIDE_DURATION = 20000; // ms
+        let slideshowTimer = null;
 
         // Limites de controle (mantidos)
         const controlLimits = {
@@ -322,6 +332,7 @@
                     </div>`;
                 container.appendChild(noSlide);
                 currentSlideIndex = 0;
+                restartSlideshow();
                 return;
             }
 
@@ -347,7 +358,7 @@
                         <div class="card">
                             <div class="card-title">Resumo de Status das Análises</div>
                             <div style="flex:1;display:flex;align-items:center;">
-                                <table>
+                                <table class="tbl-capa">
                                     <thead>
                                         <tr>
                                             <th>EQUIPAMENTO / TANQUE</th>
@@ -380,13 +391,14 @@
                                 const val = r?.[`Val${k}`];
                                 vals += `<td style="font-weight:600;">${val ?? '—'}</td>`;
                             }
+                            // DATA centralizada (sem força de alinhamento à esquerda)
                             return `<tr><td style="font-weight:600;">${r?.Data ?? '-'}</td>${vals}</tr>`;
                         }).join('');
 
                         card.innerHTML = `
                             <div class="card-title">${ana?.nome ?? '—'}</div>
                             <div class="chart-wrapper"><canvas id="${canvasId}"></canvas></div>
-                            <table>
+                            <table class="tbl-analises">
                                 <thead><tr><th>DATA</th>${headers}</tr></thead>
                                 <tbody>${rows}</tbody>
                             </table>`;
@@ -402,6 +414,7 @@
             });
 
             currentSlideIndex = 0;
+            restartSlideshow();
         }
 
         function renderChart(id, chartData, tankName) {
@@ -416,8 +429,6 @@
             }
 
             // Prepara anotações (faixa ideal)
-            // - Para tanques simples: usa min/max direto
-            // - Para multi-parâmetro: tenta casar com o label do 1º dataset; se não achar, usa o 1º disponível
             let ann = {};
             const firstLabel = dsArr[0]?.label ?? '';
             const limits = getLimitsFor(tankName, firstLabel);
@@ -484,13 +495,44 @@
             }
         }
 
+        // --- Slideshow com tempo fixo e consistente ---
+        function clearSlideshowTimer() {
+            if (slideshowTimer) {
+                clearTimeout(slideshowTimer);
+                slideshowTimer = null;
+            }
+        }
+
+        function scheduleNextSlide() {
+            clearSlideshowTimer();
+            slideshowTimer = setTimeout(() => {
+                nextSlide();
+                scheduleNextSlide();
+            }, SLIDE_DURATION);
+        }
+
+        function restartSlideshow() {
+            // Garante que o slide ativo atual fique o tempo completo
+            scheduleNextSlide();
+        }
+
         function nextSlide() {
             const slides = document.querySelectorAll('.slide');
             if (slides.length <= 1) return;
+
             slides[currentSlideIndex].classList.remove('active');
             currentSlideIndex = (currentSlideIndex + 1) % slides.length;
             slides[currentSlideIndex].classList.add('active');
         }
+
+        // Reinicia temporizador ao voltar a aba/janela
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                restartSlideshow();
+            } else {
+                clearSlideshowTimer();
+            }
+        });
 
         function updateClock() {
             const now = new Date();
@@ -502,7 +544,7 @@
 
         // Timers
         setInterval(updateClock, 1000);
-        setInterval(nextSlide, 20000);
+        // Removido o setInterval de nextSlide; usamos o scheduleNextSlide
         setInterval(fetchData, 60000);
 
         // Boot
