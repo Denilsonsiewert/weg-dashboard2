@@ -34,7 +34,7 @@
             background: var(--white);
             padding: 15px 40px;
             display: grid;
-            grid-template-columns: 200px 1fr 320px; /* aumentei um pouco a 3ª coluna para evitar quebra */
+            grid-template-columns: 200px 1fr 320px;
             align-items: center;
             column-gap: 16px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
@@ -58,7 +58,7 @@
             flex-direction: column;
             align-items: flex-end;
             gap: 2px;
-            min-width: 0; /* permite encolher sem forçar quebra interna */
+            min-width: 0;
         }
 
         #clock {
@@ -66,18 +66,16 @@
             font-weight: 600;
             color: var(--weg-blue);
             line-height: 1.2;
-            white-space: nowrap; /* não quebra a hora */
+            white-space: nowrap;
         }
 
-        /* Mantém TODA a data em uma única linha */
         #date {
             font-size: 0.95em;
             color: var(--weg-gray);
             line-height: 1.2;
-            white-space: nowrap; /* evita que “2026” caia para a linha de baixo */
+            white-space: nowrap;
         }
 
-        /* Ajuste preventivo em telas estreitas: diminui ligeiramente as fontes para caber na mesma linha */
         @media (max-width: 1280px) {
             #clock { font-size: 1.25em; }
             #date  { font-size: 0.9em; }
@@ -128,7 +126,22 @@
             text-align: center;
         }
 
-        .chart-wrapper { flex: 1; min-height: 0; margin-bottom: 20px; }
+        .chart-wrapper { 
+            flex: 1; 
+            min-height: 0; 
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Estilo para imagem do gráfico exportado do Excel */
+        .chart-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
+        }
 
         table {
             width: 100%;
@@ -186,7 +199,6 @@
             100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
         }
 
-        /* --- Correção solicitada: Centralizar “DATA” (cabeçalho e valores) nas tabelas dos cards de análise --- */
         .card table thead th:first-child,
         .card table tbody td:first-child {
             text-align: center;
@@ -228,14 +240,13 @@
         let currentSlideIndex = 0;
         let dataCache = null;
         const wegColors = ['#00579d', '#00a1e4', '#58595b', '#808285'];
-        const chartsRegistry = new Map(); // id -> Chart instance
+        const chartsRegistry = new Map();
 
-        // NOVAS VARIÁVEIS PARA O AGENDADOR
-        const DISPLAY_MS = 20000;       // 20s por slide
-        let slideTimer = null;          // id do setTimeout atual
+        const DISPLAY_MS = 20000;
+        let slideTimer = null;
         let lastSwitchTs = performance.now();
 
-        // Limites de controle (mantidos)
+        // Limites de controle
         const controlLimits = {
             "Desengraxante": { min: 30, max: 40 },
             "Ativação - Tanque 5": { min: 0.5, max: 1.5 },
@@ -255,12 +266,11 @@
             }
         };
 
-        // --- Helpers robustos ---
         const normalize = (s) => (s ?? '')
             .toString()
-            .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
-            .replace(/[º°]/g, '') // remove símbolos grau/ordinal
-            .replace(/\s+/g, ' ') // espaços múltiplos -> 1
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/[º°]/g, '')
+            .replace(/\s+/g, ' ')
             .trim()
             .toLowerCase();
 
@@ -268,12 +278,10 @@
             const lim = controlLimits?.[tankName];
             if (!lim) return null;
 
-            // Caso simples (um único range min/max)
             if (typeof lim.min === 'number' || typeof lim.max === 'number') {
                 return lim;
             }
 
-            // Caso multi-parâmetro: busca flexível por chave
             const nLabel = normalize(datasetLabel);
             let found = null;
 
@@ -285,7 +293,6 @@
                 }
             }
 
-            // Fallback: primeiro parâmetro se não achou correspondência
             return found ?? lim[Object.keys(lim)[0]];
         }
 
@@ -315,7 +322,6 @@
 
                 setupSlides();
 
-                // Reagendar a próxima troca com o tempo restante do ciclo atual
                 const now = performance.now();
                 const elapsed = now - lastSwitchTs;
                 const remaining = DISPLAY_MS - (elapsed % DISPLAY_MS);
@@ -336,8 +342,6 @@
         function setupSlides() {
             const container = document.getElementById('slides');
             container.innerHTML = '';
-
-            // Destroi charts prévios para evitar vazamento
             destroyAllCharts();
 
             const analisesAll = Array.isArray(dataCache?.analises) ? dataCache.analises : [];
@@ -367,7 +371,6 @@
 
             slidesData.forEach((slideObj, sIndex) => {
                 const slide = document.createElement('div');
-                // Não marcamos mais "active" aqui; reativaremos ao final conforme currentSlideIndex
                 slide.className = 'slide';
 
                 if (slideObj.tipo === 'capa') {
@@ -421,20 +424,35 @@
                                 const val = r?.[`Val${k}`];
                                 vals += `<td style="text-align:center;font-weight:600;">${val ?? '—'}</td>`;
                             }
-                            // DATA centralizada
                             return `<tr><td style="text-align:center;font-weight:600;">${r?.Data ?? '-'}</td>${vals}</tr>`;
                         }).join('');
 
-                        card.innerHTML = `
-                            <div class="card-title">${ana?.nome ?? '—'}</div>
-                            <div class="chart-wrapper"><canvas id="${canvasId}"></canvas></div>
-                            <table>
-                                <thead><tr><th style="text-align:center;">DATA</th>${headers}</tr></thead>
-                                <tbody>${rows}</tbody>
-                            </table>`;
+                        // Verifica se existe imagem do gráfico exportada do Excel
+                        const hasChartImage = ana?.chart_image && ana.chart_image.trim() !== '';
 
-                        // Garante que o canvas exista antes de renderizar
-                        requestAnimationFrame(() => renderChart(canvasId, ana?.chart_data, ana?.nome));
+                        if (hasChartImage) {
+                            // Usa a imagem exportada do Excel
+                            card.innerHTML = `
+                                <div class="card-title">${ana?.nome ?? '—'}</div>
+                                <div class="chart-wrapper">
+                                    <img src="${ana.chart_image}" alt="Gráfico ${ana?.nome ?? ''}" class="chart-image">
+                                </div>
+                                <table>
+                                    <thead><tr><th style="text-align:center;">DATA</th>${headers}</tr></thead>
+                                    <tbody>${rows}</tbody>
+                                </table>`;
+                        } else {
+                            // Fallback: gera gráfico com Chart.js se não houver imagem
+                            card.innerHTML = `
+                                <div class="card-title">${ana?.nome ?? '—'}</div>
+                                <div class="chart-wrapper"><canvas id="${canvasId}"></canvas></div>
+                                <table>
+                                    <thead><tr><th style="text-align:center;">DATA</th>${headers}</tr></thead>
+                                    <tbody>${rows}</tbody>
+                                </table>`;
+
+                            requestAnimationFrame(() => renderChart(canvasId, ana?.chart_data, ana?.nome));
+                        }
 
                         slide.appendChild(card);
                     });
@@ -443,9 +461,7 @@
                 container.appendChild(slide);
             });
 
-            // --- Reaplicar a visibilidade do slide corrente sem resetar índice ---
             const slides = container.querySelectorAll('.slide');
-            // Clampar o índice ao total atual de slides
             currentSlideIndex = Math.max(0, Math.min(currentSlideIndex, slides.length - 1));
             slides.forEach(s => s.classList.remove('active'));
             if (slides[currentSlideIndex]) slides[currentSlideIndex].classList.add('active');
@@ -457,12 +473,8 @@
 
             const labels = Array.isArray(chartData?.labels) ? chartData.labels : [];
             const dsArr = Array.isArray(chartData?.datasets) ? chartData.datasets : [];
-            if (dsArr.length === 0) {
-                // Sem datasets, não renderiza
-                return;
-            }
+            if (dsArr.length === 0) return;
 
-            // Prepara anotações (faixa ideal)
             let ann = {};
             const firstLabel = dsArr[0]?.label ?? '';
             const limits = getLimitsFor(tankName, firstLabel);
@@ -529,7 +541,6 @@
             }
         }
 
-        // --- NOVO: controle do ciclo de slides com tempo exato por slide ---
         function showSlideAt(index) {
             const slides = document.querySelectorAll('.slide');
             if (slides.length === 0) return;
@@ -551,7 +562,6 @@
                     showSlideAt((currentSlideIndex + 1) % slides.length);
                 }
                 lastSwitchTs = performance.now();
-                // Agenda novamente o ciclo completo
                 scheduleNextSlide(DISPLAY_MS);
             }, Math.max(0, delayMs));
         }
@@ -559,21 +569,17 @@
         function updateClock() {
             const now = new Date();
             document.getElementById('clock').textContent = now.toLocaleTimeString('pt-BR');
-            // Mantém a data inteira em uma única linha via CSS (white-space: nowrap)
             document.getElementById('date').textContent = now.toLocaleDateString('pt-BR', {
                 weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
             });
         }
 
-        // Agendadores
         setInterval(updateClock, 1000);
         setInterval(fetchData, 60000);
 
-        // Boot
         updateClock();
         fetchData();
 
-        // Inicia o agendador de slides (garante 20s por slide; fetchData re-sincroniza após cada atualização)
         lastSwitchTs = performance.now();
         scheduleNextSlide(DISPLAY_MS);
     </script>
