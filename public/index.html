@@ -304,6 +304,16 @@
             return Number.isFinite(n) ? n : null;
         }
 
+        // PATCH: aceita Base64 com ou sem prefixo data:image/...;base64,
+        function ensureDataUrl(imgStr, defaultType = 'png') {
+            if (!imgStr) return '';
+            const s = String(imgStr).trim();
+            if (s.startsWith('data:image/')) return s;
+            // se for apenas Base64, prefixa
+            const looksBase64 = /^[A-Za-z0-9+/=\s]+$/.test(s);
+            return looksBase64 ? `data:image/${defaultType};base64,${s}` : s;
+        }
+
         async function fetchData() {
             try {
                 const base = (window.location && window.location.origin && window.location.origin !== 'null')
@@ -428,19 +438,35 @@
                         }).join('');
 
                         // Verifica se existe imagem do gráfico exportada do Excel
-                        const hasChartImage = ana?.chart_image && ana.chart_image.trim() !== '';
+                        const hasChartImage = !!(ana?.chart_image && String(ana.chart_image).trim() !== '');
 
                         if (hasChartImage) {
-                            // Usa a imagem exportada do Excel
+                            // PATCH: pré-carrega imagem e aplica fallback se falhar (sem alterar aparência)
+                            const imgSrc = ensureDataUrl(ana.chart_image, 'png');
+                            const imgId = `img-${sIndex}-${aIndex}`;
+
                             card.innerHTML = `
                                 <div class="card-title">${ana?.nome ?? '—'}</div>
                                 <div class="chart-wrapper">
-                                    <img src="${ana.chart_image}" alt="Gráfico ${ana?.nome ?? ''}" class="chart-image">
+                                    <img id="${imgId}" src="" alt="Gráfico ${ana?.nome ?? ''}" class="chart-image" />
                                 </div>
                                 <table>
                                     <thead><tr><th style="text-align:center;">DATA</th>${headers}</tr></thead>
                                     <tbody>${rows}</tbody>
                                 </table>`;
+
+                            // pré-carregar
+                            const el = card.querySelector('#' + imgId);
+                            const tmp = new Image();
+                            tmp.onload = () => { el.src = imgSrc; };
+                            tmp.onerror = () => {
+                                console.warn('Falha ao carregar imagem base64, usando fallback Chart.js');
+                                const wrapper = card.querySelector('.chart-wrapper');
+                                wrapper.innerHTML = `<canvas id="${canvasId}"></canvas>`;
+                                requestAnimationFrame(() => renderChart(canvasId, ana?.chart_data, ana?.nome));
+                            };
+                            tmp.src = imgSrc;
+
                         } else {
                             // Fallback: gera gráfico com Chart.js se não houver imagem
                             card.innerHTML = `
